@@ -12,3 +12,33 @@ Build System: CMake
 Environment: Docker
 Version Control: Git / GitHub
 Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, game AI
+---
+ 
+## 專案結構
+ 
+```
+sprout2026-hw2/
+├── CMakeLists.txt
+├── Dockerfile
+├── README.md
+├── server.py
+├── src/
+│   ├── main.cpp
+│   ├── tile.h / tile.cpp
+│   ├── validator.h / validator.cpp     ← 本次修改（遊戲引擎）
+│   ├── board.h / board.cpp
+│   ├── player.h / player.cpp
+│   ├── game_manager.h / game_manager.cpp
+│   ├── ai_agent_0.h / ai_agent_0.cpp   ← 本次修改（AI agent）
+│   ├── ai_agent_baseline0.h
+│   ├── ai_agent_baseline1.h
+│   └── human_agent.h / human_agent.cpp ← 本次修改（human agent）
+├── prebuilt/
+├── grader/
+└── visualizer/
+    ├── index.html
+    ├── app.js
+    └── styles.css
+```
+ 
+---
