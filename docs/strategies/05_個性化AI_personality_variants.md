@@ -13,7 +13,7 @@
 `AIAgent_0` 加入三個 `protected virtual` 的參數鉤子：
  
 ```cpp
-virtual int getEnemyDrawThreshold() const { return 8; }
+virtual int getEnemyDrawThreshold() const { return 8; } 
 virtual int getHoardCooldownTurns() const { return 4; }
 virtual int getAntiStalemateThreshold() const { return 20; }
 ```
