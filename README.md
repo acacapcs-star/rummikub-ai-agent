@@ -1,196 +1,494 @@
-# TankMan RL Agent
-> 以強化學習（PPO）訓練自主坦克決策系統  
-> 榮獲 2025 FunAI 營隊坦克大作戰冠軍（39 組參賽）
-
+# Rummikub AI Agent 設計實作：從規則驗證到策略優化
+[🇹🇼 中文](#中文) ｜ [🇬🇧 English](#english)
 ---
+<a name="中文"></a>
+# 🇹🇼 中文
 
+> **關於這個 repository 的範圍**
+>
+> 本 repo 收錄的是**本人撰寫的原始碼與設計文件**（`src/`、`docs/`）。完整建置另需
+> 課程提供的框架（`CMakeLists.txt`、`Dockerfile`、`server.py`、`visualizer/`）
+> 與助教提供的 baseline 物件檔（`prebuilt/ai_agent_baseline*.cpp.o`）；這些屬於
+> 課程材料，未包含在此，因此直接 clone 本 repo 無法逕行編譯。
+>
+> 完整的實作說明、開發困難與測試數據見
+> **[期末報告 PDF](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)**。
+ 
 ## 專案簡介
-
-本專案為 [TankMan](https://github.com/Jesse-Jumbo/TankMan) 遊戲平台的 AI 模組，核心問題是：
-
-> **如何讓 AI 在動態環境中，同時學會「移動追敵」與「瞄準射擊」兩種技能？**
-
-我將這個問題拆解為兩個獨立的強化學習子任務，各自設計 Gymnasium 環境與獎勵函數，再整合為完整的對戰 Agent。
-
+ 
+本專案是 2026 資訊之芽 C++ 班大作業二的延伸實作，主題為拉密（Rummikub）遊戲系統與 AI Agent 設計。專案目標不只是讓程式能夠正確判斷牌組是否合法，也需要設計一支能夠自動分析局勢、出牌、利用桌面牌重組，並嘗試打敗 baseline agent 的 AI。
+ 
+在這個專案中，我完成了遊戲規則驗證、Human Agent 檔案讀取，以及 AI Agent 的策略設計。AI Agent 的核心目標是：在一般對戰中保留彈性與爆發力，在殘局中降低手牌失分，並且盡量避免提交非法盤面。
+ 
+這個專案讓我第一次完整體驗到「遊戲規則 → 程式建模 → AI 策略 → 壓力測試 → 策略修正」的開發流程。
+ 
 ---
-
-## 系統架構
-
-```
-TankMan RL Agent
-├── tankman/
-│   ├── base_env.py          # 基礎 Gymnasium 環境（抽象類別）
-│   ├── chase_env.py         # 追擊模組：學習移動朝向目標
-│   ├── aim_env.py           # 瞄準模組：學習轉砲管＋判斷射擊時機
-│   └── resupply_env_v0.py   # 補給模組：學習移動至補給站
-└── TankMan_student/
-    └── ml/
-        ├── train.py         # PPO 訓練腳本
-        ├── ml_play_model.py # 載入模型進行對戰
-        └── QT.py            # 規則式基準 Agent
-```
-
+ 
 ---
-
-## 核心設計：三個子模組
-
-### 1. 瞄準模組（`aim_env.py`）
-
-**任務**：讓坦克砲管轉向目標點，並在對準時射擊。
-
-**觀察空間（Observation Space）**：
-```
-[gun_angle_index, angle_to_target_index]  # shape: (2,), dtype: float32
-```
-- 將 360° 離散化為 8 個方向（每格 45°），讓 RL 更容易學習角度關係
-
-**動作空間（Action Space）**：
-```
-0: NONE
-1: AIM_LEFT   # 砲管左轉
-2: AIM_RIGHT  # 砲管右轉
-3: SHOOT      # 射擊
-```
-
-**獎勵函數設計**：
-
-| 情境 | 動作 | 獎勵 |
-|------|------|------|
-| 砲管偏右於目標 | AIM_LEFT（正確） | +1.0 |
-| 砲管偏右於目標 | AIM_RIGHT（錯誤） | -1.0 |
-| 砲管偏左於目標 | AIM_RIGHT（正確） | +1.0 |
-| 砲管偏左於目標 | AIM_LEFT（錯誤） | -1.0 |
-| 砲管完全對準目標 | SHOOT | +1.0 |
-| 砲管未對準 | SHOOT（亂射） | -1.0 |
-| 對準時不射擊 | 任何非SHOOT | -0.5 |
-| 砲管與目標相差 180° | 轉任意方向 | -0.5 |
-
+ 
+## 延伸閱讀：策略細節拆解
+ 
+大風吹、一條龍等核心演算法的完整設計脈絡（含圖解、想過但沒做出來的構想誠實記錄），拆成獨立文件放在 `docs/strategies/`：
+ 
+- [01 一條龍：最長 Run 掃描](docs/strategies/01_一條龍_longest_run.md)
+- [02 大風吹：全域重組演算法](docs/strategies/02_大風吹_windstorm.md)
+- [03 調牌與心機戰術：讀牌、讀對手](docs/strategies/03_調牌與心機戰術_denial_tactics.md)
+- [04 橫向縱向掃描模式：二維對照表與顏色分堆的取捨](docs/strategies/04_橫向縱向掃描模式_scan_modes.md)
+- [05 個性化 AI：繼承與多型的實驗與取捨（個人延伸專案）](docs/strategies/05_個性化AI_personality_variants.md)
+- [06 認知教練型 AI：從打贏對手到陪伴引導的完整原型（個人延伸專案）](docs/strategies/06_認知教練型AI_設計說明.md)
 ---
-
-### 2. 追擊模組（`chase_env.py`）
-
-**任務**：讓坦克車身轉向並前進至目標位置。
-
-**觀察空間**：
+ 
+## 使用技術
+ 
+```text
+Language: C++
+Build System: CMake
+Environment: Docker
+Version Control: Git / GitHub
+Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, game AI
 ```
-[tank_angle_index, angle_to_target_index]  # shape: (2,), dtype: float32
-```
-
-**動作空間**：
-```
-0: NONE
-1: FORWARD    # 前進
-2: BACKWARD   # 後退
-3: TURN_LEFT  # 左轉
-4: TURN_RIGHT # 右轉
-```
-
+ 
 ---
+ 
+## 專案結構
+ 
+```
+rummikub-ai-agent/          ← 本 repo 收錄的部分
+├── README.md
+├── src/
+│   ├── main.cpp
+│   ├── tile.h / tile.cpp
+│   ├── validator.h / validator.cpp     ← 本次修改（遊戲引擎）
+│   ├── board.h / board.cpp
+│   ├── player.h / player.cpp
+│   ├── game_manager.h / game_manager.cpp
+│   ├── ai_agent_0.h / ai_agent_0.cpp   ← 本次修改（AI agent）
+│   ├── ai_agent_baseline0.h
+│   ├── ai_agent_baseline1.h
+│   └── human_agent.h / human_agent.cpp ← 本次修改（human agent）
+├── docs/
+│   ├── report/                  ← 期末報告 PDF
+│   └── strategies/              ← 策略細節拆解文件（見上方延伸閱讀）
+│       ├── 01_一條龍_longest_run.md
+│       ├── 02_大風吹_windstorm.md
+│       ├── 03_調牌與心機戰術_denial_tactics.md
+│       ├── 04_橫向縱向掃描模式_scan_modes.md
+│       ├── 05_個性化AI_personality_variants.md
+│       └── 06_認知教練型AI_設計說明.md
+├── 一條龍_diagram.png
+└── 大風吹_flowchart.png
 
-### 3. 補給模組（`resupply_env_v0.py`）
-
-**任務**：讓坦克在燃油或彈藥不足時，主動移動至補給站。支援隨機化玩家與補給類型，增加訓練多樣性。
-
+（以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
+  prebuilt/ · grader/ · visualizer/）
+```
+ 
 ---
-
-## 訓練方式
-
-使用 [Stable Baselines3](https://stable-baselines3.readthedocs.io/) 的 PPO 演算法。
-
+ 
+## 核心功能實作
+ 
+### 遊戲引擎（`validator.cpp`）
+ 
+實作了 `isValidRun` 與 `isValidGroup` 兩個核心驗證函式：
+ 
+- **Run（順組）**：3 張以上、同色、數字連續，Joker 可代入缺號位置
+- **Group（群組）**：3～4 張、同數字、顏色互異，Joker 可補缺色
+出牌的唯一入口是 `Board::applyProposedSets()`，它會依序檢查七件事——牌源合法性、有無重複、原桌面牌是否全部保留、未破冰前不可重組、每個 set 是否合法、破冰分數是否 ≥30——只要有一項不通過，整批提案會被打回，桌面與手牌完全不會被改動。
+ 
+### 檔案讀取（`human_agent.cpp`）
+ 
+完成 `waitForActionFile()` 輪詢等待 `action.json`，以及 `applyActionFile()` 解析並提交人類玩家的操作。
+ 
+---
+ 
+## AI Agent 策略設計
+ 
+`AIAgent_0` 的決策邏輯依優先序分成五層：
+ 
+| 階段 | 核心機制 | 對應程式碼 |
+|---|---|---|
+| 破冰 | 兩層貪心：先只用純手牌找候選，湊不到 30 分才把 Joker 納入；候選依「Joker 用量少 → 分數高」排序 | `tryInitialMeld()` |
+| 反僵局 | 牌堆剩餘 ≤20 張時放棄囤牌、全力進攻 | `playTurn()` |
+| 囤牌觀察 | 手牌出現「重疊牌型」（同數字 ≥2 色、且鄰近數字也在手上）時，冷卻 4 回合保留戰術彈性 | `internalCheckOverlap()` |
+| 反擊 | 監控對手連續抽牌次數，達門檻（實測後由 3 調整為 8）視為對手卡關，觸發全域重組 | `enemy_draw_count` |
+| 殘局 | 牌堆抽完後解除所有限制，迴圈呼叫重組直到打不出牌為止 | `playTurn()` 殘局分支 |
+ 
+### 核心創新：「大風吹」全域重組
+ 
+這是本次實作中投入最多心力的部分（對應 `tryExtendBoard()`）：
+ 
+1. 把桌面與手牌全部攤開，依顏色重新分堆，掃描拼出最長合法 Run，缺口用 Joker 動態填補
+2. 桌面上原本就合法的 Group 整組跳過、不拆進顏色堆，避免拆了拼不回去
+3. Run 長度 ≥6 張時，模擬每個切點能讓手牌接上最多張牌，取最佳切點切成兩段
+4. **安全回滾鎖**：重組完成後檢查原桌面每張牌是否都完整保留在合法組合中、且總張數確實增加，只要有一項不符合，整批 rollback，絕不提交不合法盤面
+> 開發過程中原本規劃用遞迴窮舉（`solveRummikub`）來找真正的最佳解，但考量到需要疊加安全回滾鎖來確保正確性，改用「迭代＋貪心規則」整套寫進 `tryExtendBoard`。`solveRummikub` 保留了函式介面，但目前未實際使用。
+ 
+---
+ 
+## 開發過程中的挑戰
+ 
+1. **Visualizer 讀檔格式不符**：把整場對局紀錄（陣列）直接覆蓋 `state.json`（預期是單一物件），導致 `state.players` 是 `undefined`、畫面報錯。拆成 `state.json`（當前局面）＋`state_history.json`（整場歷史）兩個檔案，對應 Replay Mode 的用途後解決。
+2. **反擊門檻太敏感**：`enemy_draw_count` 門檻原本設 ≥3，實測發現對手只要連續抽牌 3 次就幾乎每輪都觸發大風吹，反而干擾正常節奏，調高到 ≥8 後才穩定，只在對手真正卡關時出手。
+3. **本地一度測不到真正的 baseline**：`CMakeLists.txt` 裡負責串接 `prebuilt/ai_agent_baseline0.cpp.o` / `ai_agent_baseline1.cpp.o` 的區塊被誤註解掉，導致連結失敗；為了先能編譯，`main.cpp` 一度暫時把 `b0`/`b1` token 都導向自己的 `AIAgent_0` 頂替。後來把 `CMakeLists.txt` 那段還原、並在 Docker（`--platform=linux/amd64`，因為 prebuilt 物件檔是 x86_64 格式，跟 Apple Silicon 原生環境不相容）環境下重新編譯，才真正連結上助教提供的 baseline，跑出下方的真實對戰數據。
+---
+ 
+## 測試結果
+ 
+修正建置設定並在 Docker（linux/amd64）環境重新編譯、確認連結到真正的 baseline 物件檔後，進行了兩輪測試：
+ 
+**大樣本驗證（各 500 場）**
+ 
+| 對手 | 勝場 | 勝率 |
+|---|---|---|
+| baseline0 | 500 / 500 | 100% |
+| baseline1 | 320 / 500 | 64% |
+| **合計** | **820 / 1000** | **82%** |
+ 
+對 baseline1 的勝率沒有到 100%，符合預期——baseline1 本身會出手牌中的完整牌組，比完全不出牌的 baseline0 更有威脅性；但千場等級的大樣本下仍維持 64% 的整體優勢，排除了小樣本測試只是運氣好的疑慮。
+ 
+**逐場明細（各 5 場，取自大樣本測試前的驗證階段）**
+ 
+**10 / 10 全勝**（vs baseline0 五戰全勝、vs baseline1 五戰全勝）
+ 
+| 對局 | AI_0_1 分數 | 對手分數 | 結果 |
+|---|---|---|---|
+| vs baseline0 #1 | 67 | 394 | 勝 (+327) |
+| vs baseline0 #2 | 78 | 408 | 勝 (+330) |
+| vs baseline0 #3 | 71 | 465 | 勝 (+394) |
+| vs baseline0 #4 | 139 | 450 | 勝 (+311) |
+| vs baseline0 #5 | 137 | 441 | 勝 (+304) |
+| vs baseline1 #1 | 89 | 211 | 勝 (+122) |
+| vs baseline1 #2 | 119 | 154 | 勝 (+35) |
+| vs baseline1 #3 | 139 | 216 | 勝 (+77) |
+| vs baseline1 #4 | 33 | 92 | 勝 (+59) |
+| vs baseline1 #5 | 71 | 137 | 勝 (+66) |
+ 
+分數為手牌點數總和，越低越好。對 baseline0 的平均勝場分差達 +333，對 baseline1 平均勝場分差 +72——分差較小的原因是 baseline1 本身會出手牌中的完整牌組，比完全不出牌的 baseline0 更有威脅性，但兩者最終都沒能撐過 `AIAgent_0` 的大風吹重組與殘局壓分能力。
+ 
+> **驗證過程說明**：先前版本的測試數據是「本地鏡像測試」（因建置設定問題，`b0`/`b1` 一度都指向自己的 `AIAgent_0`），已在修正 `CMakeLists.txt` 並於 Docker 環境重新編譯後，替換成上方這組對戰真實 baseline 的數據。
+ 
+---
+ 
+## 心得
+ 
+最一開始的版本邏輯很單純：只要能破冰就無腦出牌，藉此把手牌壓到最低。但實際測試後發現，這樣的策略太依賴「找到當下最大化的組合」，牌堆快見底時還在猶豫要不要湊更好的組合，反而常常演變成雙方一直抽牌的僵局。
+ 
+為了打破這個情況，我把判斷依據從「手牌怎麼打分數最高」改成「牌堆還剩多少張」：當牌堆數量低於門檻時，就不再追求最大化，先求有牌出。這個調整讓 agent 終於能穩定推進牌局，而不是卡在互相抽牌。
+ 
+但光靠這個還是太看運氣。於是我開始把桌面上已經打出去的牌也一起納入考慮，設計出「一條龍」式的最長 Run 掃描：不只看手牌能不能湊出組合，也會嘗試把手牌接到桌面現有 Run 的頭尾，甚至把整個桌面拆開重拼成更長的連續數字，這也是後來「大風吹」全域重組的雛形。
+ 
+在對戰 baseline1 的過程中，我發現一味進攻其實不夠聰明——對手的行為本身就是資訊。我加入了「觀察對手連續抽牌次數」的機制：如果對手連續好幾輪都在抽牌，代表牌堆裡已經沒有他能用的組合，這時候正是發動大風吹重組、搶進度的最佳時機（門檻經過實測從 3 調整到 8，因為 3 太敏感、幾乎每回合都觸發）。
+ 
+實作大風吹的過程中，我原本規劃寫一個遞迴窮舉版本（`solveRummikub`），理論上能找到真正的最佳解。但後來考量到需要加上「安全回滾鎖」——重組完一定要驗證原本桌面上的牌是否還完整保留、張數是否真的增加，否則整批打回原狀——這種需要層層驗證的邏輯，用迭代加貪心規則反而更好掌控每一步的正確性，所以最後把整套邏輯改寫進 `tryExtendBoard`，`solveRummikub` 保留了介面但沒有真的實作。
+ 
+> **補充說明**：這份心得原本還包含兩個構想——「依手牌 Joker 張數（0／1／2 張）切換三種判斷分支」，以及「刻意出錯留數字空格、藉此引誘對手洩漏手牌」的戰術。誠實記錄一下：這兩個機制在最終版的 `ai_agent_0.cpp` 裡**沒有**實際寫成程式碼。目前的 Joker 處理是在 `tryInitialMeld()` 用「候選組合依 Joker 用量少、分數高排序」的統一貪心邏輯，而不是依手牌 Joker 數切換的三分支；囤牌偵測則是 `internalCheckOverlap()`，判斷的是手牌本身的重疊牌型（同數字 ≥2 色、且鄰近數字也在手上），跟主動誘敵完全無關。留下這段是想保留當時的思考方向，即使最後沒有真的做出來。
+ 
+---
+ 
+## 結論
+ 
+這次做出的是一支混合戰術型 `AIAgent_0`：
+ 
+- **破冰階段**：兩層貪心排序，優先省下 Joker
+- **中局**：依牌堆張數與手牌重疊牌型，在囤牌與進攻間切換
+- **反擊時機**：抓到對手連續抽牌，立刻用大風吹反擊
+- **殘局**：解除所有限制，迴圈出牌直到打不出為止
+學到最深的一課是「先求穩定合法，再談最佳化」——安全回滾鎖多次擋下了不合法的重組提案。未來想把 `solveRummikub` 補成真正的遞迴／動態規劃搜尋，取代現在的貪心啟發式。
+ 
+---
+ 
+## AI 協助揭露（Discussion & AI Policy）
+ 
+依課程規範揭露本次開發過程中使用 AI（Claude）協助的部分：
+ 
+**Claude 協助的範圍：**
+- Debug：協助定位 visualizer 讀取 `state.json` 時的格式不符問題（陣列 vs 單一物件），以及 `CMakeLists.txt` 中 baseline 連結區塊被誤註解、跨架構（arm64/x86_64）編譯導致的連結失敗問題
+- 內容校對：將這份 README／心得的文字敘述與實際送交的 `ai_agent_0.cpp` 逐項對照，指出敘述與程式碼不一致之處
+- 文件整理：協助整理與潤飾簡報、口說逐字稿與本 README 的文字排版
+**未經 Claude 協助、完全由本人設計與撰寫的部分：**
+- `validator.cpp` 的 `isValidRun` / `isValidGroup` 驗證邏輯
+- `ai_agent_0.cpp` 的所有策略與演算法設計，包括兩層貪心破冰、大風吹全域重組、長龍切斷優化、安全回滾鎖、重疊牌型偵測、對手抽牌監控反擊機制
+- `human_agent.cpp` 的檔案讀取實作
+本人對繳交的每一行程式碼負責，並理解其運作原理，如講師需要進行 Code Review，可隨時安排。
+ 
+---
+ 
+## 編譯與執行
+ 
+> 需先將本 repo 的 `src/` 置入課程框架（`sprout2026-hw2`）目錄下，並確認
+> `CMakeLists.txt` 有正確串接 `prebuilt/` 的 baseline 物件檔。
+ 
 ```bash
-python TankMan_student/ml/train.py \
-  --green-team-num 3 \
-  --blue-team-num 3 \
-  --total-time-steps 10000000 \
-  --n-envs 4 \
-  --batch-size 256 \
-  --lr 3e-4 \
-  --gamma 0.1
+# 編譯
+rm -rf build && cmake -S . -B build && cmake --build build -j
+ 
+# 執行（預設 baseline0 vs AI_0）
+cd build && ./bin/rummikub && cd ..
+ 
+# 視覺化（另開一個終端機）
+python3 server.py
+# 瀏覽器開啟 http://127.0.0.1:8080/visualizer/
 ```
-
-**主要超參數說明**：
-
-| 參數 | 值 | 說明 |
-|------|----|------|
-| `total_timesteps` | 10,000,000 | 總訓練步數 |
-| `n_envs` | 4 | 平行環境數量（加速訓練） |
-| `batch_size` | 256 | 每次更新的樣本數 |
-| `gamma` | 0.1 | 折扣因子（強調即時獎勵） |
-| `net_arch` | [64, 64] | Policy/Value network 隱藏層大小 |
-
-訓練過程使用 TensorBoard 記錄，並透過 `EvalCallback` 自動儲存最佳模型。
-
+ 
 ---
+ 
+## 文件
+ 
+- **[期末報告 PDF](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)** — 完整實作說明、開發困難、測試數據與 AI 使用揭露
+- [策略細節拆解](docs/strategies/) — 六份獨立文件，含圖解與「想過但沒做出來」的誠實記錄
+ 
+---
+ 
+## 致謝
+ 
+感謝資訊之芽講師群提供的 `sprout2026-hw2` 起始框架與課程教學。
+感謝 Claude 協助 debug 與內容校對（詳見上方 AI 協助揭露）。
+ 
+<br><br>
+ 
+---
+---
+ 
+<a name="english"></a>
+# 🇬🇧 English
 
-## 執行對戰
+> **Scope of this repository**
+>
+> This repo contains **the source code and design documents I wrote myself**
+> (`src/`, `docs/`). A full build additionally requires the course-provided
+> framework (`CMakeLists.txt`, `Dockerfile`, `server.py`, `visualizer/`) and the
+> instructor-provided baseline object files
+> (`prebuilt/ai_agent_baseline*.cpp.o`). Those are course materials and are not
+> included here, so cloning this repo alone will not compile.
+>
+> Full implementation notes, development difficulties and test data are in the
+> **[final report (PDF, in Chinese)](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)**.
+ 
+## Project Overview
+ 
+This project is an extended implementation of Assignment 2 for the 2026 Sprout (資訊之芽) C++ track, centered on building the game engine and AI agent for **Rummikub**. The goal goes beyond simply validating whether a tile set is legal — it also requires designing an agent that can analyze the board, play tiles, reorganize existing sets on the table, and attempt to beat the course's baseline agents.
+ 
+In this project I implemented the rule-validation engine, the human-agent file-reading interface, and the strategy design for the AI agent. The AI agent's core objectives are: stay flexible and aggressive during normal play, minimize leftover hand score in the endgame, and avoid submitting illegal board states as much as possible.
+ 
+This project was my first full hands-on experience with the development cycle of **rules → modeling → AI strategy → stress testing → strategy revision**.
+ 
+---
+ 
+---
+ 
+## Further Reading: Strategy Deep-Dives
+ 
+The full design story behind the windstorm and longest-run algorithms (with diagrams, and an honest record of ideas that were considered but never implemented) is broken out into standalone documents under `docs/strategies/`:
+ 
+- [01 Longest Run: The "One Dragon" Scan](docs/strategies/01_一條龍_longest_run.md)
+- [02 Windstorm: Global Reorganization Algorithm](docs/strategies/02_大風吹_windstorm.md)
+- [03 Card Denial and Tactical Reads: Reading the Board, Reading the Opponent](docs/strategies/03_調牌與心機戰術_denial_tactics.md)
+- [04 Horizontal/Vertical Scan Modes: 2D Lookup Table vs. Color Buckets](docs/strategies/04_橫向縱向掃描模式_scan_modes.md)
+- [05 Personality-Driven AI: Inheritance, Polymorphism, and Their Trade-offs (Personal Extension Project)](docs/strategies/05_個性化AI_personality_variants.md)
+- [06 Cognitive Coach AI: From Winning to Guiding — A Fully Working Prototype (Personal Extension Project)](docs/strategies/06_認知教練型AI_設計說明.md)
+---
+ 
+## Tech Stack
+ 
+```text
+Language: C++
+Build System: CMake
+Environment: Docker
+Version Control: Git / GitHub
+Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, game AI
+```
+ 
+---
+ 
+## Project Structure
+ 
+```
+rummikub-ai-agent/          ← 本 repo 收錄的部分
+├── README.md
+├── src/
+│   ├── main.cpp
+│   ├── tile.h / tile.cpp
+│   ├── validator.h / validator.cpp     ← Modified (game engine)
+│   ├── board.h / board.cpp
+│   ├── player.h / player.cpp
+│   ├── game_manager.h / game_manager.cpp
+│   ├── ai_agent_0.h / ai_agent_0.cpp   ← Modified (AI agent)
+│   ├── ai_agent_baseline0.h
+│   ├── ai_agent_baseline1.h
+│   └── human_agent.h / human_agent.cpp ← Modified (human agent)
+├── prebuilt/
+├── grader/
+├── visualizer/
+│   ├── index.html
+│   ├── app.js
+│   └── styles.css
+├── docs/
+│   ├── report/                  ← Final report (PDF)
+│   └── strategies/              ← Strategy deep-dives (see Further Reading above)
+│       ├── 01_一條龍_longest_run.md
+│       ├── 02_大風吹_windstorm.md
+│       ├── 03_調牌與心機戰術_denial_tactics.md
+│       ├── 04_橫向縱向掃描模式_scan_modes.md
+│       ├── 05_個性化AI_personality_variants.md
+│       └── 06_認知教練型AI_設計說明.md
+├── 一條龍_diagram.png
+└── 大風吹_flowchart.png
 
+（以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
+  prebuilt/ · grader/ · visualizer/）
+```
+ 
+---
+ 
+## Core Feature Implementation
+ 
+### Game Engine (`validator.cpp`)
+ 
+Implemented the two core validation functions, `isValidRun` and `isValidGroup`:
+ 
+- **Run**: 3+ tiles, same color, consecutive numbers; a Joker can substitute for the missing number
+- **Group**: 3–4 tiles, same number, all different colors; a Joker can fill a missing color
+The single entry point for playing tiles is `Board::applyProposedSets()`. It checks seven conditions in sequence — legality of tile sources, no duplicates, all original board tiles preserved, no rearranging before the initial meld, every set must be a legal Run or Group, and the initial-meld score must be ≥30. If any check fails, the entire proposal is rejected and neither the board nor the hand is modified.
+ 
+### File I/O (`human_agent.cpp`)
+ 
+Implemented `waitForActionFile()`, which polls until `action.json` can be opened, and `applyActionFile()`, which parses and submits the human player's action.
+ 
+---
+ 
+## AI Agent Strategy Design
+ 
+`AIAgent_0`'s decision logic is organized into five priority tiers:
+ 
+| Stage | Core Mechanism | Corresponding Code |
+|---|---|---|
+| Initial meld | Two-tier greedy search: first tries candidates using only plain tiles; only brings Jokers into consideration if 30 points can't be reached otherwise. Candidates are sorted by "fewer Jokers used → higher score" | `tryInitialMeld()` |
+| Anti-stalemate | Abandons hoarding and plays aggressively once the draw pile has ≤20 tiles left | `playTurn()` |
+| Hoarding detection | Enters a 4-turn cooldown to preserve tactical flexibility when the hand shows an "overlapping pattern" (same number in ≥2 colors, with an adjacent number also in hand) | `internalCheckOverlap()` |
+| Counter-attack | Monitors the opponent's consecutive draw count; once it crosses a threshold (tuned from 3 to 8 through testing), the opponent is considered stuck and a global reorganization is triggered | `enemy_draw_count` |
+| Endgame | Once the draw pile is empty, all restrictions are lifted and reorganization is called in a loop until no more tiles can be played | `playTurn()` endgame branch |
+ 
+### Core Innovation: "Windstorm" Global Reorganization
+ 
+This is the part of the implementation I invested the most effort in (corresponds to `tryExtendBoard()`):
+ 
+1. Lay out the entire board and hand, re-bucket tiles by color, and scan for the longest legal Run per color, dynamically filling gaps with Jokers
+2. Any Group already legal on the board is skipped entirely — it's not broken apart into the color buckets, to avoid ending up unable to reassemble it
+3. When a Run reaches ≥6 tiles, simulate every possible cut point and choose the one that lets the most hand tiles attach to either resulting segment
+4. **Safety rollback lock**: after reorganizing, verify that every original board tile is still present in a legal set and that the total tile count has genuinely increased. If either check fails, the entire batch is rolled back — an illegal board state is never submitted
+> I originally planned to implement `solveRummikub()` as a full recursive brute-force search to find the true optimal solution. However, since a safety rollback lock also needed to be layered on top to guarantee correctness, I switched to an "iterative + greedy rule" approach implemented entirely inside `tryExtendBoard`. `solveRummikub()` keeps its function signature but is currently unused.
+ 
+---
+ 
+## Challenges During Development
+ 
+1. **Visualizer file-format mismatch**: The full match history (an array) was directly overwriting `state.json` (which expects a single object), causing `state.players` to be `undefined` and the UI to error out. Fixed by splitting it into `state.json` (current state) and `state_history.json` (full history), matching the intended use for Replay Mode.
+2. **Counter-attack threshold too sensitive**: `enemy_draw_count`'s threshold was originally ≥3; testing showed that just 3 consecutive opponent draws triggered a windstorm almost every round, disrupting normal pacing. Raising it to ≥8 stabilized the behavior so it only fires when the opponent is genuinely stuck.
+3. **Couldn't link the real baselines locally, for a while**: The block in `CMakeLists.txt` responsible for linking `prebuilt/ai_agent_baseline0.cpp.o` / `ai_agent_baseline1.cpp.o` had been accidentally commented out, breaking the link step. As a temporary workaround to keep things compiling, `main.cpp` briefly redirected both `b0`/`b1` tokens to `AIAgent_0` itself. After restoring the `CMakeLists.txt` block and rebuilding inside Docker (`--platform=linux/amd64`, since the prebuilt object files are x86_64 and incompatible with native Apple Silicon), the agent was genuinely linked against the instructor-provided baselines, producing the real match data shown below.
+---
+ 
+## Test Results
+ 
+After fixing the build configuration and rebuilding inside Docker (linux/amd64) to confirm a real link against the baseline object files, two rounds of testing were run:
+ 
+**Large-sample validation (500 games each)**
+ 
+| Opponent | Wins | Win Rate |
+|---|---|---|
+| baseline0 | 500 / 500 | 100% |
+| baseline1 | 320 / 500 | 64% |
+| **Total** | **820 / 1000** | **82%** |
+ 
+The win rate against baseline1 falling short of 100% is expected — baseline1 plays complete sets from its hand and is more threatening than baseline0, which never plays at all. Even so, a 64% edge held up at the thousand-game scale, ruling out the possibility that a smaller sample was just a lucky streak.
+ 
+**Game-by-game detail (5 games each, from the validation phase before the large-sample run)**
+ 
+**10 / 10 wins** (5/5 vs baseline0, 5/5 vs baseline1)
+ 
+| Match | AI_0_1 Score | Opponent Score | Result |
+|---|---|---|---|
+| vs baseline0 #1 | 67 | 394 | Win (+327) |
+| vs baseline0 #2 | 78 | 408 | Win (+330) |
+| vs baseline0 #3 | 71 | 465 | Win (+394) |
+| vs baseline0 #4 | 139 | 450 | Win (+311) |
+| vs baseline0 #5 | 137 | 441 | Win (+304) |
+| vs baseline1 #1 | 89 | 211 | Win (+122) |
+| vs baseline1 #2 | 119 | 154 | Win (+35) |
+| vs baseline1 #3 | 139 | 216 | Win (+77) |
+| vs baseline1 #4 | 33 | 92 | Win (+59) |
+| vs baseline1 #5 | 71 | 137 | Win (+66) |
+ 
+Scores are the sum of remaining hand tile values — lower is better. The average winning margin against baseline0 was +333, versus +72 against baseline1. The smaller margin against baseline1 makes sense: it actually plays complete sets from its hand, making it a bigger threat than baseline0, which never plays at all — but neither could withstand `AIAgent_0`'s windstorm reorganization and endgame scoring pressure.
+ 
+> **Note on the verification process**: an earlier version of this data was a "local mirror test" (due to the build-configuration issue, `b0`/`b1` briefly pointed to `AIAgent_0` itself). After fixing `CMakeLists.txt` and rebuilding inside Docker, that data was replaced with the real baseline match results shown above.
+ 
+---
+ 
+## Reflection
+ 
+The very first version of the logic was simple: play tiles the moment an initial meld is possible, to minimize the hand as quickly as possible. In practice, though, this strategy relied too heavily on "finding the best possible combination right now" — near the end of the draw pile it would still hesitate over whether to hold out for a better combination, which often turned into both sides just drawing tiles back and forth in a stalemate.
+ 
+To break that pattern, I changed the decision criterion from "which play scores the most" to "how many tiles are left in the draw pile": once the pile drops below a threshold, the agent stops optimizing and just plays whatever it can. That change let the agent finally make steady progress instead of getting stuck in a mutual-drawing loop.
+ 
+But that alone still left too much to luck. So I started factoring in the tiles already played on the board, designing a "longest-run" scan: not just checking whether the hand alone can form a set, but also trying to attach hand tiles to either end of an existing board Run, or even tearing the whole board apart and reassembling it into longer consecutive runs — this became the prototype for what later became the "windstorm" global reorganization.
+ 
+While playing against baseline1, I realized that attacking non-stop isn't actually smart — the opponent's behavior is itself information. I added a mechanism to watch the opponent's consecutive draw count: if they keep drawing turn after turn, it means the draw pile no longer has anything useful for them, which is exactly the moment to trigger a windstorm reorganization and seize the advantage (the threshold was tuned from 3 to 8 through testing, since 3 was too sensitive and fired almost every round).
+ 
+While implementing the windstorm, I originally planned to write a full recursive brute-force version (`solveRummikub`) that could, in theory, find the true optimal solution. But once I factored in the need for a "safety rollback lock" — verifying after every reorganization that the original board tiles are all still intact and that the tile count genuinely increased, otherwise rolling the whole thing back — this kind of layered verification logic turned out to be easier to get right with iteration plus greedy rules. So I ended up rewriting the entire thing into `tryExtendBoard`, and `solveRummikub` kept its interface but was never actually implemented.
+ 
+> **Addendum**: This reflection originally also included two other ideas — "switching between three decision branches based on how many Jokers are in hand (0/1/2)," and a tactic of "deliberately leaving a numeric gap to bait the opponent into revealing their hand." Being honest about it here: neither of these ended up actually implemented in the final `ai_agent_0.cpp`. The current Joker handling in `tryInitialMeld()` uses a single unified greedy rule — sort candidates by "fewer Jokers used, higher score" — rather than three branches keyed on Joker count; and the hoarding detector is `internalCheckOverlap()`, which judges overlapping patterns within the hand itself (same number in ≥2 colors, with an adjacent number also present), with no connection at all to actively baiting an opponent. I'm keeping this note to preserve that line of thinking at the time, even though it never actually got built.
+ 
+---
+ 
+## Conclusion
+ 
+What came out of this project is a hybrid, tactics-driven `AIAgent_0`:
+ 
+- **Initial meld**: two-tier greedy sorting, prioritizing saving Jokers
+- **Midgame**: switches between hoarding and attacking based on draw-pile size and hand-overlap patterns
+- **Counter-attack timing**: the moment the opponent's consecutive draws are detected, immediately counters with a windstorm
+- **Endgame**: lifts all restrictions and loops on playing tiles until nothing more can be played
+The deepest lesson learned was "establish stability and legality first, optimize later" — the safety rollback lock caught a number of illegal reorganization proposals along the way. Looking ahead, I'd like to fill in `solveRummikub` as a genuine recursive/dynamic-programming search, replacing the current greedy heuristic.
+ 
+---
+ 
+## AI Assistance Disclosure (Discussion & AI Policy)
+ 
+As required by the course policy, here is a disclosure of how AI (Claude) was used during this project:
+ 
+**What Claude helped with:**
+- Debugging: helped pinpoint the visualizer's `state.json` format mismatch (array vs. single object), as well as the linking failure caused by a commented-out baseline-linking block in `CMakeLists.txt` and a cross-architecture (arm64/x86_64) compilation issue
+- Content review: cross-checked the wording in this README/reflection against the actual submitted `ai_agent_0.cpp`, line by line, flagging places where the narrative didn't match the code
+- Document formatting: helped organize and polish the wording and layout of the presentation, the spoken script, and this README
+**What was designed and written entirely by me, without Claude's help:**
+- The `isValidRun` / `isValidGroup` validation logic in `validator.cpp`
+- Every strategy and algorithm in `ai_agent_0.cpp`, including the two-tier greedy initial meld, the windstorm global reorganization, the long-run cut-point optimization, the safety rollback lock, the overlap-pattern hoarding detector, and the opponent-draw-count counter-attack mechanism
+- The file-reading implementation in `human_agent.cpp`
+I take full responsibility for every line of code submitted and understand how it works. I'm available for a code review with the instructor at any time if needed.
+ 
+---
+ 
+## Build & Run
+ 
+> Place this repo's `src/` inside the course framework (`sprout2026-hw2`) first,
+> and make sure `CMakeLists.txt` correctly links the baseline object files under
+> `prebuilt/`.
+ 
 ```bash
-# 安裝依賴
-pip install -r TankMan_student/requirements.txt
-
-# 使用訓練好的模型對戰
-python -m mlgame -f 120 \
-  -i TankMan_student/ml/ml_play_model.py \
-  -i TankMan_student/ml/ml_play_model.py \
-  TankMan_student \
-  --green_team_num 1 --blue_team_num 1 --frame_limit 1000
+# Build
+rm -rf build && cmake -S . -B build && cmake --build build -j
+ 
+# Run (default: baseline0 vs AI_0)
+cd build && ./bin/rummikub && cd ..
+ 
+# Visualizer (open a separate terminal)
+python3 server.py
+# Then open http://127.0.0.1:8080/visualizer/ in your browser
 ```
-
+ 
 ---
-
-## 設計亮點
-
-**角度離散化（Angle Discretization）**  
-直接用連續角度值訓練 RL 容易造成 reward 稀疏。本專案將 360° 分成 8 個方向索引（0–7），讓 Agent 更容易學習「偏左就往右轉」的簡單規則，大幅加速收斂。
-
-**問題分解策略**  
-將「對戰」這個複雜任務拆成「瞄準」與「追擊」兩個子問題，分別訓練後整合。這個思路與自動駕駛中「感知」、「決策」、「控制」分層的設計哲學相通。
-
-**獎勵函數的對稱設計**  
-獎勵函數不只給正向回饋，也明確懲罰「對的時機做錯的事」（如對準時不射擊）和「錯的時機做任何事」（如未對準就射擊），讓 Agent 學到更精確的判斷邏輯。
-
----
-
-## 與自動駕駛的關聯
-
-本專案的核心技術與自動駕駛中的關鍵問題高度對應：
-
-| 本專案 | 自動駕駛對應 |
-|--------|-------------|
-| 瞄準模組（砲管角度對準目標） | 方向盤轉向控制（Steering Control） |
-| 追擊模組（車身朝向目標移動） | 路徑跟隨（Path Following） |
-| 角度離散化觀察 | 感知資訊的特徵工程 |
-| PPO 連續決策 | 端對端自動駕駛策略學習 |
-
-需要說明的是：上表是**設計層面的類比**，用來說明這個專案處理的問題屬於哪一類，
-並不代表本模組已被實際應用於自動駕駛系統。營隊結束後，成功大學資工系蘇文鈺教授
-曾與作者討論此模組與自駕控制問題的關聯，並邀請作者參與其機器人研究的相關討論。
-
----
-
-## 開發背景
-
-本專案起源於 **2025 FunAI Winter Camp** 的坦克大作戰競賽，主辦單位為清華大學、
-成功大學、陽明交通大學與臺灣科技大學，協辦包含 Google Research 與成大智慧運算學院。
-參賽隊伍來自台灣各大學及高中，共 39 組；本隊（3 人）以此 RL 模組獲得**第一名**。
-
-作者於本次競賽期間獨立完成模組的環境設計、獎勵函數與訓練流程調校。
-
----
-
-## 技術棧
-
-- Python 3.9
-- [Stable Baselines3](https://stable-baselines3.readthedocs.io/)（PPO）
-- [Gymnasium](https://gymnasium.farama.org/)
-- [MLGame](https://github.com/PAIA-Playful-AI-Arena/mlgame) 10.2.5
-- pygame 2.0.1
-- TensorBoard
-
----
-
-## 作者
-
-**藍宥欣**  
-2025 FunAI 坦克大作戰冠軍（3 人團隊，39 組參賽）  
-[GitHub](https://github.com/acacapcs-star) | [Email](acacapcs@gmail.com)
+ 
+## Acknowledgments
+ 
+Thanks to the Sprout (資訊之芽) instructor team for providing the `sprout2026-hw2` starter framework and course instruction.
+Thanks to Claude for assistance with debugging and content review (see the AI Assistance Disclosure above for details).
+ 
