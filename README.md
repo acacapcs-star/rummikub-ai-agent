@@ -3,6 +3,16 @@
 ---
 <a name="中文"></a>
 # 🇹🇼 中文
+
+> **關於這個 repository 的範圍**
+>
+> 本 repo 收錄的是**本人撰寫的原始碼與設計文件**（`src/`、`docs/`）。完整建置另需
+> 課程提供的框架（`CMakeLists.txt`、`Dockerfile`、`server.py`、`visualizer/`）
+> 與助教提供的 baseline 物件檔（`prebuilt/ai_agent_baseline*.cpp.o`）；這些屬於
+> 課程材料，未包含在此，因此直接 clone 本 repo 無法逕行編譯。
+>
+> 完整的實作說明、開發困難與測試數據見
+> **[期末報告 PDF](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)**。
  
 ## 專案簡介
  
@@ -43,11 +53,8 @@ Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, gam
 ## 專案結構
  
 ```
-rummikub-ai-agent/
-├── CMakeLists.txt
-├── Dockerfile
+rummikub-ai-agent/          ← 本 repo 收錄的部分
 ├── README.md
-├── server.py
 ├── src/
 │   ├── main.cpp
 │   ├── tile.h / tile.cpp
@@ -59,13 +66,8 @@ rummikub-ai-agent/
 │   ├── ai_agent_baseline0.h
 │   ├── ai_agent_baseline1.h
 │   └── human_agent.h / human_agent.cpp ← 本次修改（human agent）
-├── prebuilt/
-├── grader/
-├── visualizer/
-│   ├── index.html
-│   ├── app.js
-│   └── styles.css
 ├── docs/
+│   ├── report/                  ← 期末報告 PDF
 │   └── strategies/              ← 策略細節拆解文件（見上方延伸閱讀）
 │       ├── 01_一條龍_longest_run.md
 │       ├── 02_大風吹_windstorm.md
@@ -74,8 +76,10 @@ rummikub-ai-agent/
 │       ├── 05_個性化AI_personality_variants.md
 │       └── 06_認知教練型AI_設計說明.md
 ├── 一條龍_diagram.png
-├── 大風吹_diagram.png
 └── 大風吹_flowchart.png
+
+（以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
+  prebuilt/ · grader/ · visualizer/）
 ```
  
 ---
@@ -210,6 +214,9 @@ rummikub-ai-agent/
  
 ## 編譯與執行
  
+> 需先將本 repo 的 `src/` 置入課程框架（`sprout2026-hw2`）目錄下，並確認
+> `CMakeLists.txt` 有正確串接 `prebuilt/` 的 baseline 物件檔。
+ 
 ```bash
 # 編譯
 rm -rf build && cmake -S . -B build && cmake --build build -j
@@ -221,6 +228,13 @@ cd build && ./bin/rummikub && cd ..
 python3 server.py
 # 瀏覽器開啟 http://127.0.0.1:8080/visualizer/
 ```
+ 
+---
+ 
+## 文件
+ 
+- **[期末報告 PDF](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)** — 完整實作說明、開發困難、測試數據與 AI 使用揭露
+- [策略細節拆解](docs/strategies/) — 六份獨立文件，含圖解與「想過但沒做出來」的誠實記錄
  
 ---
  
@@ -236,6 +250,18 @@ python3 server.py
  
 <a name="english"></a>
 # 🇬🇧 English
+
+> **Scope of this repository**
+>
+> This repo contains **the source code and design documents I wrote myself**
+> (`src/`, `docs/`). A full build additionally requires the course-provided
+> framework (`CMakeLists.txt`, `Dockerfile`, `server.py`, `visualizer/`) and the
+> instructor-provided baseline object files
+> (`prebuilt/ai_agent_baseline*.cpp.o`). Those are course materials and are not
+> included here, so cloning this repo alone will not compile.
+>
+> Full implementation notes, development difficulties and test data are in the
+> **[final report (PDF, in Chinese)](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)**.
  
 ## Project Overview
  
@@ -276,11 +302,8 @@ Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, gam
 ## Project Structure
  
 ```
-rummikub-ai-agent/
-├── CMakeLists.txt
-├── Dockerfile
+rummikub-ai-agent/          ← 本 repo 收錄的部分
 ├── README.md
-├── server.py
 ├── src/
 │   ├── main.cpp
 │   ├── tile.h / tile.cpp
@@ -299,6 +322,7 @@ rummikub-ai-agent/
 │   ├── app.js
 │   └── styles.css
 ├── docs/
+│   ├── report/                  ← Final report (PDF)
 │   └── strategies/              ← Strategy deep-dives (see Further Reading above)
 │       ├── 01_一條龍_longest_run.md
 │       ├── 02_大風吹_windstorm.md
@@ -307,8 +331,10 @@ rummikub-ai-agent/
 │       ├── 05_個性化AI_personality_variants.md
 │       └── 06_認知教練型AI_設計說明.md
 ├── 一條龍_diagram.png
-├── 大風吹_diagram.png
 └── 大風吹_flowchart.png
+
+（以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
+  prebuilt/ · grader/ · visualizer/）
 ```
  
 ---
@@ -442,6 +468,10 @@ I take full responsibility for every line of code submitted and understand how i
 ---
  
 ## Build & Run
+ 
+> Place this repo's `src/` inside the course framework (`sprout2026-hw2`) first,
+> and make sure `CMakeLists.txt` correctly links the baseline object files under
+> `prebuilt/`.
  
 ```bash
 # Build
