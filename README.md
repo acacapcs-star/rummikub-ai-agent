@@ -16,7 +16,7 @@
  
 ## 專案簡介
  
-本專案是 2026 資訊之芽 C++ 班大作業二的延伸實作，主題為拉密（Rummikub）遊戲系統與 AI Agent 設計。專案目標不只是讓程式能夠正確判斷牌組是否合法，也需要設計一支能夠自動分析局勢、出牌、利用桌面牌重組，並嘗試打敗 baseline agent 的 AI。
+本專案是 2026 資訊之芽 C++ 班大作業二的延伸實作，主題為拉密（Rummikub）遊戲系統與 AI Agent 設計。**二階大作業成績 49.8/50，為全台最高分（二階結業 17 人）。**專案目標不只是讓程式能夠正確判斷牌組是否合法，也需要設計一支能夠自動分析局勢、出牌、利用桌面牌重組，並嘗試打敗 baseline agent 的 AI。
  
 在這個專案中，我完成了遊戲規則驗證、Human Agent 檔案讀取，以及 AI Agent 的策略設計。AI Agent 的核心目標是：在一般對戰中保留彈性與爆發力，在殘局中降低手牌失分，並且盡量避免提交非法盤面。
  
@@ -265,7 +265,7 @@ python3 server.py
  
 ## Project Overview
  
-This project is an extended implementation of Assignment 2 for the 2026 Sprout (資訊之芽) C++ track, centered on building the game engine and AI agent for **Rummikub**. The goal goes beyond simply validating whether a tile set is legal — it also requires designing an agent that can analyze the board, play tiles, reorganize existing sets on the table, and attempt to beat the course's baseline agents.
+This project is an extended implementation of Assignment 2 for the 2026 Sprout (資訊之芽) C++ track, centered on building the game engine and AI agent for **Rummikub**. **The assignment scored 49.8/50 — the highest nationally among the 17 students who completed the second stage.** The goal goes beyond simply validating whether a tile set is legal — it also requires designing an agent that can analyze the board, play tiles, reorganize existing sets on the table, and attempt to beat the course's baseline agents.
  
 In this project I implemented the rule-validation engine, the human-agent file-reading interface, and the strategy design for the AI agent. The AI agent's core objectives are: stay flexible and aggressive during normal play, minimize leftover hand score in the endgame, and avoid submitting illegal board states as much as possible.
  
