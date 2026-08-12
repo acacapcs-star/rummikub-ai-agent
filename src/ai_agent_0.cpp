@@ -343,6 +343,7 @@ bool AIAgent_0::tryInitialMeld(Board& board) {
    ------------------------------------------------------- */
 int AIAgent_0::tryExtendBoard(Board& board) {
     TurnMetrics::regroup_attempted = true;
+    TurnMetrics::extend_calls++;
     // 💡 1. 隔離保護：一進來先完整保存 100% 合法的最初桌面狀態
     //先暫時刪掉std::vector<std::vector<Tile*>> absolute_backup_sets = board.getSets();
  
@@ -419,9 +420,12 @@ int AIAgent_0::tryExtendBoard(Board& board) {
                 }
                 
                 if (played_this_tile) {
+                    TurnMetrics::had_option = true;
                     std::vector<std::vector<Tile*>> single_propose = current_sets;
                     single_propose[i] = am_set;
+                    TurnMetrics::failed_applies++;
                     if (board.applyProposedSets(this, single_propose) == Board::ApplyResult::Ok) {
+                        TurnMetrics::failed_applies--;
                         total_tiles_played++;
                         tiles_were_played_this_round = true;
                         break;
@@ -650,7 +654,10 @@ int AIAgent_0::tryExtendBoard(Board& board) {
     
     // 💡 只有當「原本桌面的老牌全部安全」且「桌上總張數變多（代表打出新牌）」才上傳
     if (all_board_tiles_safe && final_board_tiles_count > (int)board_tiles_pool.size()) {
+        TurnMetrics::failed_applies++;
         if (board.applyProposedSets(this, final_legal_board) == Board::ApplyResult::Ok) {
+            TurnMetrics::failed_applies--;
+            TurnMetrics::had_option = true;
             total_tiles_played += (final_board_tiles_count - board_tiles_pool.size());
             std::cout << "🔥 [心機收割] 大風吹重組完美成功，打出了 " << total_tiles_played << " 張手牌！\n";
             TurnMetrics::tiles_played += total_tiles_played;
@@ -762,7 +769,8 @@ void AIAgent_0::playTurn(Board& board, int draw_pile_size) {
     last_draw_pile_size = draw_pile_size;
     
     if (!initial_meld_done) {
-        if (tryInitialMeld(board)) return;
+        TurnMetrics::meld_attempts++;
+        if (tryInitialMeld(board)) { TurnMetrics::melded = true; return; }
         return; 
     }
  
