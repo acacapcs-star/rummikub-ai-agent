@@ -1,4 +1,4 @@
-
+#include "turn_metrics.h"
 #include "ai_agent_0.h"
 #include "validator.h"
 #include <algorithm>
@@ -342,6 +342,7 @@ bool AIAgent_0::tryInitialMeld(Board& board) {
    【絕對安全防回退版】tryExtendBoard - 終極大風吹重組
    ------------------------------------------------------- */
 int AIAgent_0::tryExtendBoard(Board& board) {
+    TurnMetrics::regroup_attempted = true;
     // 💡 1. 隔離保護：一進來先完整保存 100% 合法的最初桌面狀態
     //先暫時刪掉std::vector<std::vector<Tile*>> absolute_backup_sets = board.getSets();
  
@@ -652,11 +653,13 @@ int AIAgent_0::tryExtendBoard(Board& board) {
         if (board.applyProposedSets(this, final_legal_board) == Board::ApplyResult::Ok) {
             total_tiles_played += (final_board_tiles_count - board_tiles_pool.size());
             std::cout << "🔥 [心機收割] 大風吹重組完美成功，打出了 " << total_tiles_played << " 張手牌！\n";
+            TurnMetrics::tiles_played += total_tiles_played;
             return total_tiles_played;
         }
     }
     
     // 🚨 任何一絲不完美，立刻強制回滾最初乾淨狀態，絕不上傳髒盤面給裁判，不跳重複指針紅字！
+    TurnMetrics::tiles_played += total_tiles_played;
     board.applyProposedSets(this, safe_after_basic_extend_sets);
     //board.applyProposedSets(this, absolute_backup_sets);這行暫時替換成上面那一行！
     return total_tiles_played;
@@ -729,6 +732,7 @@ void AIAgent_0::solveRummikub(std::vector<std::vector<Tile*>> current_table, std
    playTurn - 決策大腦端（對手連續抽牌 3 次反擊機制）
    ------------------------------------------------------- */
 void AIAgent_0::playTurn(Board& board, int draw_pile_size) {
+    TurnMetrics __tm(name);
     std::cout << "\n--- " << name << "'s turn ---\n";
     
     /* =========================================================================
