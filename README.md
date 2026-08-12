@@ -113,6 +113,7 @@ rummikub-ai-agent/          ← 本 repo 收錄的部分
 | 殘局 | 牌堆抽完後解除所有限制，迴圈呼叫重組直到打不出牌為止 | `playTurn()` 殘局分支 |
  
 ### 核心創新：「大風吹」全域重組
+![大風吹全域重組流程](docs/images/regroup-flowchart.png)Ｓ
  
 這是本次實作中投入最多心力的部分（對應 `tryExtendBoard()`）：
  
