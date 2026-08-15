@@ -196,6 +196,12 @@ CognitiveHintEngine::MeldCandidate CognitiveHintEngine::findBestMeldCandidate(
             int joker_covered_score = 0;
 
             for (size_t k = start + 1; k < bucket.size(); ++k) {
+                // 同色同數字在拉密裡有兩張。Run 不能有重複數字，
+                // 遇到重複要跳過，不能當成 gap = 0 直接接上去——
+                // 那會湊出「紅5 紅5 紅6」這種 Validator 判不合法的組合，
+                // 然後 REVEAL 會叫玩家把它打出去。
+                if (bucket[k]->getNumber() == last_number) continue;
+
                 int gap = bucket[k]->getNumber() - last_number - 1;
                 if (gap > 0) {
                     if (used_jokers + gap > total_jokers) break; // Joker 不夠填這個缺口
@@ -206,16 +212,40 @@ CognitiveHintEngine::MeldCandidate CognitiveHintEngine::findBestMeldCandidate(
                 last_number = bucket[k]->getNumber();
             }
 
-            int length = static_cast<int>(real_tiles.size()) + used_jokers;
+            // 填完內部缺口若還有 Joker 剩下，往兩端延伸。
+            //
+            // 原本不做延伸，理由是「控制掃描複雜度」。但那個簡化會產生一句錯話：
+            // 手上「紅11 紅12 Joker」其實是紅 11-12-13、36 分、足以破冰，
+            // 引擎卻回報「湊不出合法的組合，去抽一張牌吧」。
+            // 漏報一組是可接受的保守；叫玩家放棄一手 36 分的破冰不是保守，是講錯話。
+            //
+            // 優先往高端延伸：Joker 代表的數字越大分數越高，
+            // 而破冰的門檻本來就是分數。
+            int extra_jokers = 0;
+            int extra_score = 0;
+            {
+                int lo = real_tiles.front()->getNumber();
+                int hi = last_number;
+                int remaining = total_jokers - used_jokers;
+                while (remaining > 0) {
+                    if (hi + 1 <= 13)      { ++hi; extra_score += hi; }
+                    else if (lo - 1 >= 1)  { --lo; extra_score += lo; }
+                    else break;   // 已經頂到 1–13 兩端，再多的 Joker 也放不下
+                    ++extra_jokers;
+                    --remaining;
+                }
+            }
+
+            int length = static_cast<int>(real_tiles.size()) + used_jokers + extra_jokers;
             if (length >= 3) {
-                int score = joker_covered_score;
+                int score = joker_covered_score + extra_score;
                 for (Tile* t : real_tiles) score += t->getNumber();
                 if (score > best.score) {
                     best.found = true;
                     best.score = score;
                     best.is_run = true;
                     best.tiles = real_tiles;
-                    best.joker_count = used_jokers;
+                    best.joker_count = used_jokers + extra_jokers;
                 }
             }
         }
