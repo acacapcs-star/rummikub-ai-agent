@@ -168,6 +168,42 @@ rummikub-ai-agent/          ← 本 repo 收錄的部分
 > **驗證過程說明**：先前版本的測試數據是「本地鏡像測試」（因建置設定問題，`b0`/`b1` 一度都指向自己的 `AIAgent_0`），已在修正 `CMakeLists.txt` 並於 Docker 環境重新編譯後，替換成上方這組對戰真實 baseline 的數據。
  
 ---
+
+## 測試
+
+```bash
+g++ -std=c++17 -I src tests/test_validator.cpp src/validator.cpp src/tile.cpp -o test_validator
+./test_validator
+```
+
+**40 項單元測試，全部通過**，不依賴任何測試框架，單檔可編譯執行。
+
+測試對象是 `isValidRun` 與 `isValidGroup`——這兩個函式是整個遊戲引擎的地基，
+`Board::applyProposedSets()` 的七道檢查裡有兩道直接呼叫它們。一旦判錯，
+AI 會提交不合法的盤面而被引擎打回；更糟的是把合法組合誤判成不合法，
+白白放棄可以出的牌。
+
+涵蓋的邊界情況：
+
+| 類別 | 測到的東西 |
+|---|---|
+| Run 基本 | 張數下限、空集合、四色都能通過 |
+| Run 連續性 | 跳號、重複數字、**遞減順序不算連續** |
+| Run · Joker | 補中間 / 開頭 / 結尾、兩張連續補、**一張補不了兩格缺口** |
+| Run 邊界 | **Joker 推算出 0 或 14 必須拒絕**、13 之後不繞回 1 |
+| Group 基本 | 3–4 張、**五張必然重複顏色所以不成立** |
+| Group 顏色 | 顏色重複、四張中兩張同色 |
+| Group · Joker | 補缺色、**Joker 不能掩蓋顏色重複** |
+| 互斥性 | 合法 Run 不被判成 Group，反之亦然 |
+
+其中兩項特別值得一提：
+
+- **全部都是 Joker 的組合必須拒絕**——沒有任何已知數字可以推算，
+  無論 Run 或 Group 都不成立。
+- **`{Joker, 1, 2}` 與 `{12, 13, Joker}` 必須拒絕**——推算結果會落在 1–13 之外，
+  這是最容易漏掉的一種非法組合。
+
+---
  
 ## 心得
  
@@ -422,6 +458,42 @@ Scores are the sum of remaining hand tile values — lower is better. The averag
  
 > **Note on the verification process**: an earlier version of this data was a "local mirror test" (due to the build-configuration issue, `b0`/`b1` briefly pointed to `AIAgent_0` itself). After fixing `CMakeLists.txt` and rebuilding inside Docker, that data was replaced with the real baseline match results shown above.
  
+---
+
+## Tests
+
+```bash
+g++ -std=c++17 -I src tests/test_validator.cpp src/validator.cpp src/tile.cpp -o test_validator
+./test_validator
+```
+
+**40 unit tests, all passing** — no test framework required, compiles as a single file.
+
+The tests target `isValidRun` and `isValidGroup`, the foundation of the whole game
+engine: two of the seven checks inside `Board::applyProposedSets()` call them directly.
+If either misjudges, the agent submits illegal boards and gets rejected — or worse,
+treats a legal set as illegal and gives up tiles it could have played.
+
+Edge cases covered:
+
+| Category | What is tested |
+|---|---|
+| Run basics | Minimum length, empty set, all four colours |
+| Run continuity | Gaps, duplicate numbers, **descending order is not a run** |
+| Run · Joker | Fills middle / start / end, two consecutive jokers, **one joker cannot span a two-slot gap** |
+| Run bounds | **Jokers inferring 0 or 14 must be rejected**; 13 does not wrap to 1 |
+| Group basics | 3–4 tiles, **five tiles necessarily repeat a colour** |
+| Group colours | Duplicate colours, two of four sharing a colour |
+| Group · Joker | Fills a missing colour, **a joker cannot mask a duplicate colour** |
+| Mutual exclusion | A valid run is never judged a group, and vice versa |
+
+Two cases worth calling out:
+
+- **An all-joker set must be rejected** — there is no known number to anchor the
+  inference, for either a run or a group.
+- **`{Joker, 1, 2}` and `{12, 13, Joker}` must be rejected** — the inferred value falls
+  outside 1–13, and this is the easiest illegal case to miss.
+
 ---
  
 ## Reflection
