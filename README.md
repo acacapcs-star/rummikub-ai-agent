@@ -35,7 +35,7 @@
 - [03 調牌與心機戰術：讀牌、讀對手](docs/strategies/03_調牌與心機戰術_denial_tactics.md)
 - [04 橫向縱向掃描模式：二維對照表與顏色分堆的取捨](docs/strategies/04_橫向縱向掃描模式_scan_modes.md)
 - [05 個性化 AI：繼承與多型的實驗與取捨（個人延伸專案）](docs/strategies/05_個性化AI_personality_variants.md)
-- [06 認知教練型 AI：六關遞減引導、技巧偵測與 1,475 項測試（個人延伸專案）](docs/strategies/06_認知教練型AI_設計說明.md)
+- [06 認知教練型 AI：六關遞減引導、技巧偵測與 1,475 項測試（個人延伸專案）](docs/strategies/06_認知教練型AI_設計說明.md) · [English](docs/strategies/06_cognitive_coach_en.md)
 ---
  
 ## 使用技術
@@ -321,7 +321,7 @@ The full design story behind the windstorm and longest-run algorithms (with diag
 - [03 Card Denial and Tactical Reads: Reading the Board, Reading the Opponent](docs/strategies/03_調牌與心機戰術_denial_tactics.md)
 - [04 Horizontal/Vertical Scan Modes: 2D Lookup Table vs. Color Buckets](docs/strategies/04_橫向縱向掃描模式_scan_modes.md)
 - [05 Personality-Driven AI: Inheritance, Polymorphism, and Their Trade-offs (Personal Extension Project)](docs/strategies/05_個性化AI_personality_variants.md)
-- [06 Cognitive Coach AI: From Winning to Guiding — A Fully Working Prototype (Personal Extension Project)](docs/strategies/06_認知教練型AI_設計說明.md)
+- [06 Cognitive Coach AI: From Winning to Guiding — A Fully Working Prototype (Personal Extension Project)](docs/strategies/06_認知教練型AI_設計說明.md) · [English](docs/strategies/06_cognitive_coach_en.md)
 ---
  
 ## Tech Stack
