@@ -26,4 +26,9 @@
    用 C++17 的 inline 變數，避免多個 .cpp 檔案引入時的重複定義問題。
    ========================================================================= */
 inline std::string g_current_coach_hint;
+
+// 過關後的 5 題複習。空字串 = 現在不在複習狀態；
+// 非空時是 Agent 組好的完整 JSON 物件，前端顯示題目與選項，
+// 玩家以 {"action":"answer","choice":N} 回覆。
+inline std::string g_current_recap;
 inline std::function<void()> g_trigger_state_reexport;

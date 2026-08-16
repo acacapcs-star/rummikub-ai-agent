@@ -8,6 +8,12 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <thread>
+#include <chrono>
+#include <cstdlib>
+#include <cctype>
 #include <cstdio>
 
 /* =========================================================================
@@ -48,10 +54,12 @@
    1. 卡關偵測看的是「整個桌面有沒有變化」，不是精確地只針對這個玩家本人。
       1 對 1 對局下兩者等價；4 人局的語意需要調整。（沿用上一版的限制）
 
-   2. 過關後的 5 題 MCQ 沒有接進來。檔案輪詢的介面沒有「問玩家一個問題
-      並等他選」的通道，硬做會變成另一套 action.json 協定。這裡只在過關時
-      印出提示，實際的 MCQ 留待前端支援後再接。
-      這是缺口，不是已完成——recapFor() 目前仍然只有測試在呼叫。
+   2. 過關後的 5 題 MCQ 走 g_current_recap 信箱 + action.json 的
+      {"action":"answer","choice":N} 回覆。因為舊版前端不認得這個協定，
+      預設是關閉的：要設環境變數 COACH_RECAP=1 才會進入互動作答，
+      否則只把題目印在終端機、不等待輸入，舊前端不會卡死在等答案。
+      逾時（預設 180 秒，COACH_RECAP_TIMEOUT 可調）也會放棄複習繼續遊戲。
+      前端顯示 recap 的部分尚未實作，這是缺口。
 
    3. 技巧偵測沿用 TechniqueDetector 的保守判準（寧可漏判不可誤判），
       所以玩家實際用出的招數可能比記錄下來的多。少記一次進度，
@@ -186,8 +194,7 @@ private:
                   << "」達成——用出 " << done.required_uses << " 次，其中 "
                   << done.required_unassisted << " 次沒看答案。\n";
 
-        // MCQ 複習還沒接進檔案輪詢的介面，這裡只提示，不假裝做完了。
-        std::cout << "（本關有 5 題複習尚未接入介面）\n";
+        runRecap(done.level, done.name);
 
         if (campaign_.advance()) {
             const LevelConfig& next = campaign_.currentConfig();
@@ -200,6 +207,163 @@ private:
             std::cout << "-> 六關全部完成。之後的提示層級維持在最後一關的設定。\n";
         }
         std::cout << "\n";
+    }
+
+    // ── 過關複習：5 題 MCQ ───────────────────────────────
+    //
+    // 答錯第一次給 hint、第二次之後給 explanation，然後**繼續問到答對為止**。
+    // 刻意不做「看完解答就跳下一題」：那樣玩家可以一路亂按看完五題解答，
+    // 複習就變成翻答案本。解答看過還是要自己選一次。
+    void runRecap(int level, const std::string& level_name) {
+        std::vector<McqQuestion> qs = CoachCampaign::recapFor(level);
+        if (qs.empty()) return;
+
+        if (!recapEnabled()) {
+            // 舊前端不認得 recap 協定，只印在終端機、不等作答。
+            std::cout << "（本關 " << qs.size()
+                      << " 題複習未啟用互動作答，設 COACH_RECAP=1 開啟）\n";
+            for (std::size_t i = 0; i < qs.size(); ++i)
+                std::cout << "  " << (i + 1) << ". " << qs[i].prompt << "\n";
+            return;
+        }
+
+        for (std::size_t i = 0; i < qs.size(); ++i) {
+            int attempt = 1;
+            std::string feedback;
+
+            while (true) {
+                g_current_recap = buildRecapJSON(level, level_name, i, qs.size(),
+                                                 attempt, qs[i], feedback);
+                if (g_trigger_state_reexport) g_trigger_state_reexport();
+
+                std::cout << "  [複習 " << (i + 1) << "/" << qs.size() << "] "
+                          << qs[i].prompt << "\n";
+                for (std::size_t k = 0; k < qs[i].options.size(); ++k)
+                    std::cout << "    " << k << ") " << qs[i].options[k].text << "\n";
+
+                int choice = -1;
+                if (!waitForAnswer(choice)) {
+                    std::cout << "  （等不到作答，略過本關複習）\n";
+                    clearRecap();
+                    return;
+                }
+
+                CoachCampaign::AnswerResult r =
+                    CoachCampaign::judge(qs[i], choice, attempt);
+
+                if (r == CoachCampaign::AnswerResult::CORRECT) {
+                    std::cout << "  正確。" << qs[i].explanation << "\n\n";
+                    break;
+                }
+                if (r == CoachCampaign::AnswerResult::WRONG_FIRST_TRY) {
+                    feedback = qs[i].hint;          // 第一次只給提示，不給答案
+                    std::cout << "  再想一次：" << feedback << "\n";
+                } else {
+                    feedback = qs[i].explanation;   // 第二次之後給完整解釋
+                    std::cout << "  " << feedback << "\n";
+                }
+                ++attempt;
+            }
+        }
+
+        clearRecap();
+        std::cout << "  本關複習完成。\n";
+    }
+
+    void clearRecap() {
+        g_current_recap.clear();
+        if (g_trigger_state_reexport) g_trigger_state_reexport();
+    }
+
+    static bool recapEnabled() {
+        const char* v = std::getenv("COACH_RECAP");
+        return v && std::string(v) == "1";
+    }
+
+    static int recapTimeoutSeconds() {
+        const char* v = std::getenv("COACH_RECAP_TIMEOUT");
+        if (!v) return 180;
+        int n = std::atoi(v);
+        return n > 0 ? n : 180;
+    }
+
+    // 等待 action.json 出現且含 "choice"。逾時回傳 false 讓遊戲繼續，
+    // 不讓一場對局因為沒人作答而永遠停住。
+    static bool waitForAnswer(int& out_choice) {
+        const int timeout = recapTimeoutSeconds();
+        for (int elapsed = 0; elapsed < timeout * 2; ++elapsed) {
+            std::ifstream f("action.json");
+            if (f.good()) {
+                std::ostringstream buf;
+                buf << f.rdbuf();
+                f.close();
+                std::string content = buf.str();
+                std::remove("action.json");
+
+                int choice;
+                if (extractChoice(content, choice)) {
+                    out_choice = choice;
+                    return true;
+                }
+                // 收到的不是作答（可能是誤送的出牌指令）——丟掉繼續等，
+                // 不當機、也不把它當成答案。
+                std::cout << "  （收到非作答的 action.json，已忽略）\n";
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        return false;
+    }
+
+    static bool extractChoice(const std::string& json, int& out) {
+        const std::string key = "\"choice\"";
+        std::size_t pos = json.find(key);
+        if (pos == std::string::npos) return false;
+        pos = json.find(':', pos);
+        if (pos == std::string::npos) return false;
+        ++pos;
+        while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) ++pos;
+        std::size_t start = pos;
+        if (pos < json.size() && json[pos] == '-') ++pos;
+        while (pos < json.size() && std::isdigit(static_cast<unsigned char>(json[pos]))) ++pos;
+        if (start == pos) return false;
+        out = std::atoi(json.substr(start, pos - start).c_str());
+        return true;
+    }
+
+    static std::string escapeJSON(const std::string& s) {
+        std::string out;
+        for (char c : s) {
+            if (c == '"' || c == '\\') { out += '\\'; out += c; }
+            else if (c == '\n') out += "\\n";
+            else if (c == '\r') out += "\\r";
+            else if (c == '\t') out += "\\t";
+            else out += c;
+        }
+        return out;
+    }
+
+    static std::string buildRecapJSON(int level, const std::string& level_name,
+                                      std::size_t index, std::size_t total,
+                                      int attempt, const McqQuestion& q,
+                                      const std::string& feedback) {
+        std::ostringstream o;
+        o << "{"
+          << "\"level\":" << level << ","
+          << "\"level_name\":\"" << escapeJSON(level_name) << "\","
+          << "\"question_index\":" << index << ","
+          << "\"question_total\":" << total << ","
+          << "\"attempt\":" << attempt << ","
+          << "\"prompt\":\"" << escapeJSON(q.prompt) << "\","
+          << "\"options\":[";
+        for (std::size_t i = 0; i < q.options.size(); ++i) {
+            if (i) o << ",";
+            o << "\"" << escapeJSON(q.options[i].text) << "\"";
+        }
+        o << "],";
+        if (feedback.empty()) o << "\"feedback\":null";
+        else                  o << "\"feedback\":\"" << escapeJSON(feedback) << "\"";
+        o << "}";
+        return o.str();
     }
 
     static std::string masteryLabel(Mastery m) {

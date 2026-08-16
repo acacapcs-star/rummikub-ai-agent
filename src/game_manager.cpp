@@ -223,6 +223,14 @@ std::string GameManager::buildStateJSON() const {
         oss << "  \"coach_hint\": null,\n";
     }
 
+    // 過關複習：非 null 時前端應顯示題目，並以
+    //   {"action":"answer","choice":N} 回覆。Agent 已組好完整 JSON 物件。
+    if (!g_current_recap.empty()) {
+        oss << "  \"recap\": " << g_current_recap << ",\n";
+    } else {
+        oss << "  \"recap\": null,\n";
+    }
+
     // Result of the previous turn's action.  null on turn 1.
     if (!last_action_player.empty()) {
         bool ok = (last_action_result == Board::ApplyResult::Ok);
