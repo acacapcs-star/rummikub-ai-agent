@@ -67,6 +67,16 @@ struct LevelConfig {
 
     int required_uses;          // 過關需要用出幾次
     int required_unassisted;    // 其中至少幾次不能是看了 REVEAL 才做的
+
+    // 保底機制：卡關超過這個回合數時，破例往下多給一層。
+    // 存在的理由是模擬實驗跑出來的——L6 的完全新手平均連續卡 16 回合，
+    // 因為那一關上限只到「輕推」，而輕推對能力不足者幾乎沒有幫助。
+    //
+    // 保底不是「你太笨了給你答案」，而是「你已經試了這麼久，
+    // 這裡確實有東西，讓我把範圍縮小一點」——系統仍然不講答案，
+    // 只是把音量調高一格。-1 表示這一關不啟用保底。
+    int safety_net_after_turns;
+    HintTier safety_net_tier;   // 保底時最多給到哪一層
 };
 
 // ── 玩家在某一項技巧上的進度 ─────────────────────────────
@@ -114,6 +124,12 @@ public:
     // 回傳 false 表示這個時候還不該開口——沉默也是一種設計，
     // 在後段關卡尤其重要：太早給提示，玩家就沒有自行發掘的空間。
     bool shouldGiveHint(int stuck_turns, HintTier& out_tier) const;
+
+    // 這一次的提示是不是由保底機制觸發的。
+    // 分開回報是為了讓上層能記錄「這個玩家用到了幾次保底」——
+    // 那是一個值得看的指標：保底用得太頻繁，代表關卡難度配置有問題。
+    bool shouldGiveHint(int stuck_turns, HintTier& out_tier,
+                        bool& out_from_safety_net) const;
 
     // ── 記錄一次技巧使用 ──────────────────────────────────
     void recordUse(const TechniqueUse& use);

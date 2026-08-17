@@ -18,7 +18,8 @@ static const LevelConfig kLevels[] = {
         "先學會看桌面，再學會看自己的手牌。",
         100,
         0, 1, 2, HintTier::REVEAL_MOVE,
-        3, 1
+        3, 1,
+        -1, HintTier::REVEAL_MOVE      // L1 本來就給答案，不需要保底
     },
     {
         2, Technique::COMPLETE_GROUP, "補第四色",
@@ -26,7 +27,8 @@ static const LevelConfig kLevels[] = {
         "Rummikub 只有四種顏色，所以 Group 最多四張——看到三張就是機會。",
         88,
         1, 2, 4, HintTier::REVEAL_MOVE,
-        3, 1
+        3, 1,
+        -1, HintTier::REVEAL_MOVE      // 同上
     },
     {
         3, Technique::JOKER_FILL, "Joker 補缺口",
@@ -34,7 +36,8 @@ static const LevelConfig kLevels[] = {
         "但 Joker 是稀有資源——同樣分數下能不用就不用，留到後面更有價值。",
         76,
         1, 3, 5, HintTier::REVEAL_MOVE,
-        3, 1
+        3, 1,
+        -1, HintTier::REVEAL_MOVE      // 同上
     },
     {
         4, Technique::INITIAL_MELD, "破冰湊 30 分",
@@ -42,7 +45,8 @@ static const LevelConfig kLevels[] = {
         "這一關開始，系統只會指方向，不會直接講答案。",
         64,
         2, 4, -1, HintTier::POINT_TO_AREA,
-        3, 2
+        3, 2,
+        10, HintTier::REVEAL_MOVE     // 卡 10 回合破例講答案
     },
     {
         5, Technique::BOARD_RESHUFFLE, "大風吹重組",
@@ -50,7 +54,8 @@ static const LevelConfig kLevels[] = {
         "重組後每一組都必須合法，而且桌面上原本的牌一張都不能少。",
         52,
         2, 5, -1, HintTier::POINT_TO_AREA,
-        3, 2
+        3, 2,
+        10, HintTier::REVEAL_MOVE     // 同上
     },
     {
         6, Technique::RUN_SPLIT, "長龍切斷",
@@ -58,7 +63,8 @@ static const LevelConfig kLevels[] = {
         "這一關系統只會輕推一下——剩下的要靠自己找。",
         40,
         3, -1, -1, HintTier::GENTLE_NUDGE,
-        3, 3
+        3, 3,
+        12, HintTier::POINT_TO_AREA   // 卡 12 回合破例指方向，仍不講答案
     },
 };
 
@@ -88,7 +94,22 @@ int CoachCampaign::totalLevels() {
 // 沉默也是一種設計：卡關回合數還沒到門檻時，系統不開口。
 // 後段關卡的門檻拉得比較高，就是要留出自行發掘的空間。
 bool CoachCampaign::shouldGiveHint(int stuck_turns, HintTier& out_tier) const {
+    bool ignored = false;
+    return shouldGiveHint(stuck_turns, out_tier, ignored);
+}
+
+bool CoachCampaign::shouldGiveHint(int stuck_turns, HintTier& out_tier,
+                                   bool& out_from_safety_net) const {
     const LevelConfig& cfg = currentConfig();
+    out_from_safety_net = false;
+
+    // 保底優先判斷：卡太久時，破例把音量調高一格。
+    if (cfg.safety_net_after_turns >= 0 &&
+        stuck_turns >= cfg.safety_net_after_turns) {
+        out_tier = cfg.safety_net_tier;
+        out_from_safety_net = true;
+        return true;
+    }
 
     // 由深到淺檢查：先看夠不夠格拿到最深的那層。
     if (cfg.reveal_after_turns >= 0 &&
@@ -322,12 +343,12 @@ std::vector<McqQuestion> CoachCampaign::recapFor(int level) {
         qs.push_back({
             "桌面有「藍 11、藍 12、藍 13」，你手上只有一張 Joker。能接上去嗎？",
             {{"能，接在藍 13 後面", false},
-             {"不能，13 已經是最大，後面沒有數字可以代替", false},
+             {"不能，13 已經是最大，後面沒有數字可以代替", true},
              {"能，接在藍 11 前面當藍 10", true},
              {"完全不能出", false}},
             "Run 的數字範圍是 1 到 13，Joker 代替的那個數字也必須落在這個範圍內。",
             "接在後面會變成 14，超出範圍不合法；接在前面當藍 10 則完全可以。"
-            "Joker 代替的數字同樣受 1–13 限制，這是它唯一的邊界。"
+            "這題有兩個選項描述同一個正確判斷——重點是理解 Joker 的值也受 1–13 限制。"
         });
     }
     else if (level == 4) {
