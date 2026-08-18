@@ -79,3 +79,4 @@ Testing/
 turn_metrics.csv
 test_build
 header.csv
+.testbuild/
