@@ -55,32 +55,81 @@ Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, gam
 ```
 rummikub-ai-agent/          ← 本 repo 收錄的部分
 ├── README.md
-├── src/
+│
+├── src/                         對戰型 AI
 │   ├── main.cpp
 │   ├── tile.h / tile.cpp
-│   ├── validator.h / validator.cpp     ← 本次修改（遊戲引擎）
+│   ├── validator.h / validator.cpp        ← 遊戲引擎（規則驗證）
 │   ├── board.h / board.cpp
 │   ├── player.h / player.cpp
 │   ├── game_manager.h / game_manager.cpp
-│   ├── ai_agent_0.h / ai_agent_0.cpp   ← 本次修改（AI agent）
+│   ├── ai_agent_0.h / ai_agent_0.cpp      ← 對戰型 AI agent
 │   ├── ai_agent_baseline0.h
 │   ├── ai_agent_baseline1.h
-│   └── human_agent.h / human_agent.cpp ← 本次修改（human agent）
+│   ├── human_agent.h / human_agent.cpp
+│   ├── cognitive_hint_engine.h / .cpp     ← 三層提示（教練型的起點）
+│   ├── coach_campaign.h / .cpp            ← 六個關卡、掌握度、保底
+│   └── technique_detector.h / .cpp        ← 從盤面變化反推用了哪一招
+│
+├── coach/                       教練型 AI（抽象化之後）
+│   ├── coach_engine.h                     領域無關的引擎
+│   ├── coach_modes.h                      五種遊玩模式
+│   ├── coach_session.h                    整合層：把四個模組接起來
+│   ├── demo.cpp / demo_modes.cpp / demo_session.cpp
+│   ├── test_engine.cpp                    31 項（用假領域，不碰真實應用）
+│   ├── test_modes.cpp                     30 項
+│   ├── test_session.cpp                   33 項（測接線）
+│   ├── domains/
+│   │   ├── rummikub_domain.h              真實拉密，六招全接
+│   │   ├── gridnav_domain.h               機器人格點導航（驗證抽象成立）
+│   │   ├── demo_rummikub.cpp
+│   │   └── test_rummikub_domain.cpp       52 項
+│   ├── battle/                            玩家自訂的挑戰規則
+│   │   ├── mini_battle.h                  欄位、子句、解鎖門檻
+│   │   ├── battle_parser.h                tokenizer + parser + 檢查器
+│   │   ├── demo_battle.cpp
+│   │   └── test_battle.cpp                59 項
+│   └── recap/                             關卡結束的五題 MCQ
+│       ├── recap.h
+│       ├── recap_bank.cpp                 六關 × 五題
+│       ├── recap_experiment.cpp           三種過關條件的模擬
+│       └── test_recap.cpp                 36 項
+│
+├── rl/                          Actor-Critic 實驗（手刻，不用 PyTorch）
+│   ├── mini_env.h                         簡化環境
+│   ├── actor_critic.h                     含前向與反向傳播
+│   ├── train.cpp
+│   └── ablation.cpp                       三種修法 × 五個種子
+│
+├── experiments/
+│   └── learner_simulation.cpp             五種學習者 × 每關 2000 次
+│
+├── tests/
+│   └── test_validator.cpp                 40 項（isValidRun / isValidGroup）
+│
 ├── docs/
-│   ├── report/                  ← 期末報告 PDF
-│   └── strategies/              ← 策略細節拆解文件（見上方延伸閱讀）
+│   ├── report/                            期末報告 PDF
+│   └── strategies/
 │       ├── 01_一條龍_longest_run.md
 │       ├── 02_大風吹_windstorm.md
 │       ├── 03_調牌與心機戰術_denial_tactics.md
 │       ├── 04_橫向縱向掃描模式_scan_modes.md
 │       ├── 05_個性化AI_personality_variants.md
-│       └── 06_認知教練型AI_設計說明.md
+│       ├── 06_認知教練型AI_設計說明.md
+│       ├── 07_學習者模擬實驗.md           ← 發現 L6 新手卡 16 回合
+│       ├── 08_抽象化.md                   ← 引擎與領域分離
+│       ├── 09_ActorCritic實驗.md          ← 單一種子的結論是錯的
+│       └── 10_Recap過關條件實驗.md        ← 「3/5 是中庸值」是錯的
+│
 ├── 一條龍_diagram.png
 └── 大風吹_flowchart.png
 
 （以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
   prebuilt/ · grader/ · visualizer/）
 ```
+
+**測試 281 項**：validator 40 · 抽象引擎 31 · 拉密領域 52 ·
+自訂挑戰 59 · 五種模式 30 · Recap 36 · 整合層 33
  
 ---
  
@@ -339,40 +388,83 @@ Core Concepts: OOP, pointer identity, greedy strategy, board reconstruction, gam
 ## Project Structure
  
 ```
-rummikub-ai-agent/          ← 本 repo 收錄的部分
+rummikub-ai-agent/          ← what this repo contains
 ├── README.md
-├── src/
+│
+├── src/                         Competitive AI
 │   ├── main.cpp
 │   ├── tile.h / tile.cpp
-│   ├── validator.h / validator.cpp     ← Modified (game engine)
+│   ├── validator.h / validator.cpp        ← game engine (rule validation)
 │   ├── board.h / board.cpp
 │   ├── player.h / player.cpp
 │   ├── game_manager.h / game_manager.cpp
-│   ├── ai_agent_0.h / ai_agent_0.cpp   ← Modified (AI agent)
+│   ├── ai_agent_0.h / ai_agent_0.cpp      ← competitive agent
 │   ├── ai_agent_baseline0.h
 │   ├── ai_agent_baseline1.h
-│   └── human_agent.h / human_agent.cpp ← Modified (human agent)
-├── prebuilt/
-├── grader/
-├── visualizer/
-│   ├── index.html
-│   ├── app.js
-│   └── styles.css
+│   ├── human_agent.h / human_agent.cpp
+│   ├── cognitive_hint_engine.h / .cpp     ← three-tier hints
+│   ├── coach_campaign.h / .cpp            ← six levels, mastery, safety net
+│   └── technique_detector.h / .cpp        ← infers technique from board delta
+│
+├── coach/                       Coaching AI (after abstraction)
+│   ├── coach_engine.h                     domain-agnostic engine
+│   ├── coach_modes.h                      five play modes
+│   ├── coach_session.h                    integration layer
+│   ├── demo.cpp / demo_modes.cpp / demo_session.cpp
+│   ├── test_engine.cpp                    31 tests (fake domain only)
+│   ├── test_modes.cpp                     30 tests
+│   ├── test_session.cpp                   33 tests (wiring)
+│   ├── domains/
+│   │   ├── rummikub_domain.h              real Rummikub, all six techniques
+│   │   ├── gridnav_domain.h               robot grid navigation
+│   │   ├── demo_rummikub.cpp
+│   │   └── test_rummikub_domain.cpp       52 tests
+│   ├── battle/                            player-authored challenge rules
+│   │   ├── mini_battle.h                  fields, clauses, unlock gates
+│   │   ├── battle_parser.h                tokenizer + parser + checker
+│   │   ├── demo_battle.cpp
+│   │   └── test_battle.cpp                59 tests
+│   └── recap/                             five MCQs at the end of each level
+│       ├── recap.h
+│       ├── recap_bank.cpp                 6 levels × 5 questions
+│       ├── recap_experiment.cpp           simulation of three pass criteria
+│       └── test_recap.cpp                 36 tests
+│
+├── rl/                          Actor-Critic experiment (hand-written)
+│   ├── mini_env.h                         simplified environment
+│   ├── actor_critic.h                     forward and backward pass
+│   ├── train.cpp
+│   └── ablation.cpp                       3 fixes × 5 seeds
+│
+├── experiments/
+│   └── learner_simulation.cpp             5 learners × 2000 runs per level
+│
+├── tests/
+│   └── test_validator.cpp                 40 tests
+│
 ├── docs/
-│   ├── report/                  ← Final report (PDF)
-│   └── strategies/              ← Strategy deep-dives (see Further Reading above)
+│   ├── report/                            final report (PDF)
+│   └── strategies/
 │       ├── 01_一條龍_longest_run.md
 │       ├── 02_大風吹_windstorm.md
 │       ├── 03_調牌與心機戰術_denial_tactics.md
 │       ├── 04_橫向縱向掃描模式_scan_modes.md
 │       ├── 05_個性化AI_personality_variants.md
-│       └── 06_認知教練型AI_設計說明.md
+│       ├── 06_認知教練型AI_設計說明.md
+│       ├── 07_學習者模擬實驗.md           ← found novices stuck 16 turns at L6
+│       ├── 08_抽象化.md                   ← engine / domain separation
+│       ├── 09_ActorCritic實驗.md          ← single-seed conclusions were wrong
+│       └── 10_Recap過關條件實驗.md        ← "3 of 5 is a fair middle" was wrong
+│
 ├── 一條龍_diagram.png
 └── 大風吹_flowchart.png
 
-（以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
-  prebuilt/ · grader/ · visualizer/）
+(Provided by the course, not included here: CMakeLists.txt · Dockerfile ·
+ server.py · prebuilt/ · grader/ · visualizer/)
 ```
+
+**281 tests**: validator 40 · engine 31 · Rummikub domain 52 ·
+battle 59 · modes 30 · recap 36 · integration 33
  
 ---
  
