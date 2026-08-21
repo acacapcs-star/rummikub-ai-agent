@@ -6,14 +6,17 @@
 
 > **關於這個 repository 的範圍**
 >
-> 本 repo 收錄的是**本人撰寫的原始碼與設計文件**（`src/`、`docs/`）。完整建置另需
+> 本 repo 收錄的是**本人撰寫的原始碼與設計文件**（`src/`、`coach/`、`rl/`、`tests/`、`experiments/`、`docs/`）。完整建置另需
 > 課程提供的框架（`CMakeLists.txt`、`Dockerfile`、`server.py`、`visualizer/`）
 > 與助教提供的 baseline 物件檔（`prebuilt/ai_agent_baseline*.cpp.o`）；這些屬於
 > 課程材料，未包含在此，因此直接 clone 本 repo 無法逕行編譯。
 >
 > 完整的實作說明、開發困難與測試數據見
 > **[期末報告 PDF](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)**。
- 
+>
+> Repo 導覽見 **[REPO_MAP.md](REPO_MAP.md)** —— 71 個檔案、約 11,000 行，
+> 依六章結構說明各模組負責什麼，以及哪些部分尚未完成。
+
 ## 專案簡介
  
 本專案是 2026 資訊之芽 C++ 班大作業二的延伸實作，主題為拉密（Rummikub）遊戲系統與 AI Agent 設計。二階大作業成績 49.8/50，為全台最高分（二階結業 17 人）。**專案目標不只是讓程式能夠正確判斷牌組是否合法，也需要設計一支能夠自動分析局勢、出牌、利用桌面牌重組，並嘗試打敗 baseline agent 的 AI。
@@ -348,6 +351,9 @@ python3 server.py
 >
 > Full implementation notes, development difficulties and test data are in the
 > **[final report (PDF, in Chinese)](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)**.
+>
+> Repo 導覽見 **[REPO_MAP.md](REPO_MAP.md)** —— 71 個檔案、約 11,000 行，
+> 依六章結構說明各模組負責什麼，以及哪些部分尚未完成。
  
 ## Project Overview
  
