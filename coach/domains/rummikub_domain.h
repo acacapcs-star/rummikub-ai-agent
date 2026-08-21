@@ -304,12 +304,20 @@ private:
     // ═════════════════════════════════════════════════════
     std::string nudgeFor(const RummiMove& m, const RummiState&) const {
         switch (m.kind) {
-            case RummiMove::ATTACH_RUN:      return "桌上有一條龍接得上你的牌。";
-            case RummiMove::COMPLETE_GROUP:  return "有一組差一張就滿了。";
-            case RummiMove::JOKER_FILL:      return "你的 Joker 現在派得上用場。";
-            case RummiMove::INITIAL_MELD:    return "你手上湊得出 30 分。";
-            case RummiMove::BOARD_RESHUFFLE: return "桌面重排一下會多出位置。";
-            case RummiMove::RUN_SPLIT:       return "有一條龍長到可以切開。";
+            // 輕推講的是「規則」，不是「這一手」。
+            // 模擬實驗顯示原本的狀態描述對缺乏概念的學習者效果是零。
+            case RummiMove::ATTACH_RUN:
+                return "桌上的順子，頭尾兩端都能接牌。";
+            case RummiMove::COMPLETE_GROUP:
+                return "同數字的組合最多四張——看到三張就是機會。";
+            case RummiMove::JOKER_FILL:
+                return "Joker 可以頂替順子中間缺掉的那個數字。";
+            case RummiMove::INITIAL_MELD:
+                return "第一次出牌要自己湊滿 30 分，不能碰桌上的牌。";
+            case RummiMove::BOARD_RESHUFFLE:
+                return "桌上的牌可以拆開重拼，只要每組拆完還是合法的。";
+            case RummiMove::RUN_SPLIT:
+                return "六張以上的順子切成兩段，就多出兩個可以接牌的位置。";
         }
         return "";
     }
