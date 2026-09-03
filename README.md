@@ -184,7 +184,7 @@ if (static_cast<int>(cand) > static_cast<int>(p.mastery))
 
 ## 策略設計文件
 
-`docs/strategies/` 收錄十二份設計說明，包含圖解與**想過但沒做出來的構想**：
+`docs/strategies/` 收錄十三份設計說明，包含圖解與**想過但沒做出來的構想**：
 
 | | |
 |---|---|
@@ -200,6 +200,7 @@ if (static_cast<int>(cand) > static_cast<int>(p.mastery))
 | [10 Recap 過關條件實驗](docs/strategies/10_Recap過關條件實驗.md) | 三種條件的比較 |
 | [11 認知訓練的兩個族群](docs/strategies/11_認知訓練的兩個族群.md) | 同一套節奏，相反的效果 |
 | [12 系統架構](docs/strategies/12_系統架構.md) | 整體結構 |
+| [13 關卡局面設計的兩次失敗](docs/strategies/13_關卡局面設計的兩次失敗.md) | 修好 bug 卻毀掉設計 |
 
 ---
 
@@ -434,7 +435,7 @@ The reason is in the header:
 
 ## Design documents
 
-`docs/strategies/` holds twelve design notes, with diagrams and **ideas that were considered and dropped**. Most are in Chinese; [06 has an English version](docs/strategies/06_cognitive_coach_en.md).
+`docs/strategies/` holds thirteen design notes, with diagrams and **ideas that were considered and dropped**. Most are in Chinese; [06 has an English version](docs/strategies/06_cognitive_coach_en.md).
 
 ---
 
