@@ -87,6 +87,14 @@ enum class HintTier {
 
 Joker 是最麻煩的部分，因為它同時可以當任何牌，而一組牌裡可能有兩張 Joker。驗證時必須枚舉所有可能的替代方式，任何一種成立就算合法。
 
+### 一條龍：最長順組掃描
+
+最早成形的核心構想，設計文件在 [`docs/strategies/01_一條龍_longest_run.md`](docs/strategies/01_一條龍_longest_run.md)。
+
+與其被動地看手牌能不能剛好湊出一組，不如**把桌面加手牌一起攤開，找出能延伸到最長的連續段**——只看手牌的話組合空間太小，牌堆快見底時容易變成雙方一直抽牌的僵局。
+
+![一條龍：桌面加手牌合併掃描](docs/images/straight-diagram.png)
+
 ### 大風吹：全域重組
 
 專案的核心演算法，設計文件在 [`docs/strategies/02_大風吹_windstorm.md`](docs/strategies/02_大風吹_windstorm.md)。
@@ -94,6 +102,8 @@ Joker 是最麻煩的部分，因為它同時可以當任何牌，而一組牌�
 一般的出牌邏輯是「我手上有什麼能接上桌面」。大風吹反過來：**把整個桌面拆掉重組，看能不能多塞幾張手牌進去。**
 
 對 baseline 千場測試勝率 82%。
+
+![大風吹全域重組流程](docs/images/regroup-flowchart.png)
 
 ### 一個沒有實作的介面
 
@@ -338,6 +348,14 @@ That file exists for exactly this purpose. If the abstraction were wrong, adding
 
 Jokers are the hard part, because one can stand for any tile and a set may contain two of them. Validation enumerates every possible substitution; the set is legal if any one of them works.
 
+### Longest run: scanning board and hand together
+
+The earliest idea in the project. Design document: [`docs/strategies/01`](docs/strategies/01_一條龍_longest_run.md) (Chinese).
+
+Rather than waiting for the hand alone to form a set, **the board and the hand are laid out together and scanned for the longest extendable run** — a hand on its own is too small a search space, and near the end of the draw pile both players end up drawing in deadlock.
+
+![Longest run: board and hand scanned together](docs/images/straight-diagram.png)
+
 ### Windstorm: global reorganisation
 
 The core algorithm of the project. Design document: [`docs/strategies/02`](docs/strategies/02_大風吹_windstorm.md) (Chinese).
@@ -345,6 +363,8 @@ The core algorithm of the project. Design document: [`docs/strategies/02`](docs/
 Ordinary play logic asks "what in my hand can attach to the board". Windstorm inverts it: **take the whole board apart and rebuild it, checking whether more tiles from the hand can be fitted in.**
 
 82% win rate over 1,000 games against baseline.
+
+![Windstorm: global reorganisation flow](docs/images/regroup-flowchart.png)
 
 ### An interface that was never implemented
 

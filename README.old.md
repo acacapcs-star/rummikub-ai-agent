@@ -124,8 +124,9 @@ rummikub-ai-agent/          ← 本 repo 收錄的部分
 │       ├── 09_ActorCritic實驗.md          ← 單一種子的結論是錯的
 │       └── 10_Recap過關條件實驗.md        ← 「3/5 是中庸值」是錯的
 │
-├── 一條龍_diagram.png
-└── 大風吹_flowchart.png
+└── docs/images/
+    ├── straight-diagram.png     （一條龍掃描示意圖）
+    └── regroup-flowchart.png    （大風吹全域重組流程）
 
 （以下為課程提供、未收錄於本 repo：CMakeLists.txt · Dockerfile · server.py ·
   prebuilt/ · grader/ · visualizer/）
@@ -165,7 +166,7 @@ rummikub-ai-agent/          ← 本 repo 收錄的部分
 | 殘局 | 牌堆抽完後解除所有限制，迴圈呼叫重組直到打不出牌為止 | `playTurn()` 殘局分支 |
  
 ### 核心創新：「大風吹」全域重組
-![大風吹全域重組流程](docs/images/regroup-flowchart.png)Ｓ
+![大風吹全域重組流程](docs/images/regroup-flowchart.png)
  
 這是本次實作中投入最多心力的部分（對應 `tryExtendBoard()`）：
  
@@ -462,8 +463,9 @@ rummikub-ai-agent/          ← what this repo contains
 │       ├── 09_ActorCritic實驗.md          ← single-seed conclusions were wrong
 │       └── 10_Recap過關條件實驗.md        ← "3 of 5 is a fair middle" was wrong
 │
-├── 一條龍_diagram.png
-└── 大風吹_flowchart.png
+└── docs/images/
+    ├── straight-diagram.png     （一條龍掃描示意圖）
+    └── regroup-flowchart.png    （大風吹全域重組流程）
 
 (Provided by the course, not included here: CMakeLists.txt · Dockerfile ·
  server.py · prebuilt/ · grader/ · visualizer/)
