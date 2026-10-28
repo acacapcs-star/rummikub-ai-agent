@@ -101,7 +101,9 @@ Joker 是最麻煩的部分，因為它同時可以當任何牌，而一組牌�
 
 一般的出牌邏輯是「我手上有什麼能接上桌面」。大風吹反過來：**把整個桌面拆掉重組，看能不能多塞幾張手牌進去。**
 
-對 baseline 千場測試勝率 82%。
+兩個對照組各 500 場。對 baseline0（不出牌的基礎對手）**500 / 500**；對 baseline1——助教提供的預編譯 agent——**320 / 500，勝率 64%**。平均勝場分差分別是 +333 與 +72。
+
+合計 820 / 1000（82%）。分開列是因為兩個對手的強度差很遠，合併的平均數不對應任何一場真實對局：**180 場敗績全部來自 baseline1**，對 baseline0 一場未失。逐場明細見[期末報告第五節](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)。
 
 ![大風吹全域重組流程](docs/images/regroup-flowchart.png)
 
@@ -189,6 +191,14 @@ if (static_cast<int>(cand) > static_cast<int>(p.mastery))
 ```bash
 ./run_tests.sh
 ```
+
+### 關於 `runs100.csv`
+
+根目錄的 `runs100.csv` 是逐回合的 instrumentation 輸出（`TurnMetrics`），**不是上面那組勝率的數據來源**。
+
+它是在 `CMakeLists.txt` 的 baseline 連結問題修好之前跑的。當時串接 `prebuilt/ai_agent_baseline0.cpp.o` 的區塊被誤註解掉導致連結失敗，為了先能編譯，`main.cpp` 暫時把 b0／b1 token 都導向 `AIAgent_0` 頂替——所以那份檔案實際上是 **AI_0 的 self-play**，兩邊的 agent 標籤都不是真的。拿它算勝率會得到與本頁不符的結果。原因記錄在[期末報告第四節第 3 點](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf)。
+
+留著是因為那組逐回合計時與 `failed_applies` 計數本身仍然有效（安全回滾鎖在 10,003 次 `tryExtendBoard` 呼叫中擋下 53 次無效提案），只是它量的是 self-play，不是對照實驗。
 
 ---
 
@@ -362,7 +372,9 @@ The core algorithm of the project. Design document: [`docs/strategies/02`](docs/
 
 Ordinary play logic asks "what in my hand can attach to the board". Windstorm inverts it: **take the whole board apart and rebuild it, checking whether more tiles from the hand can be fitted in.**
 
-82% win rate over 1,000 games against baseline.
+Two opponents, 500 games each. Against baseline0 (which never plays a tile): **500 / 500**. Against baseline1 — a precompiled agent supplied by the course teaching assistant — **320 / 500, a 64% win rate**. Mean winning score margin was +333 and +72 respectively.
+
+820 / 1,000 combined (82%). They are reported separately because the two opponents differ so much in strength that the combined mean corresponds to no real game: **all 180 losses are against baseline1**, none against baseline0. Per-game detail is in the [final report, section 5](docs/report/2026_資訊之芽_拉密_期末報告_藍宥欣.pdf) (Chinese).
 
 ![Windstorm: global reorganisation flow](docs/images/regroup-flowchart.png)
 
