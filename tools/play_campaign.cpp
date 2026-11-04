@@ -25,6 +25,7 @@
 
 #include "../coach/coach_engine.h"
 #include "../coach/domains/rummikub_domain.h"
+#include "../coach/coach_session.h"
 
 #include <iostream>
 #include <sstream>
@@ -179,33 +180,41 @@ RummiState makeLevelState(int level, int variant) {
                           T(5, Color::YELLOW), T(2, Color::RED)};
             }
             break;
-
         case 5:  // 大風吹重組
-            // 這一關最難設計，而且第一版設計錯了。
+            // 這一關最難設計，前後錯了三次。
             //
             // 錯誤一：手牌裡有能直接接上桌面的牌 → solve() 的優先序讓
             //         接龍先被找到，重組永遠輪不到。
             // 錯誤二：為了避開錯誤一，把手牌砍到只剩一張 →
             //         沒有選擇就沒有判斷，打 1 就過，引導失去意義。
+            // 錯誤三：Group 只放三張 → 抽掉一張只剩兩張，盤面不合法。
+            //         findReshuffle 命中、Coach 也開口了，
+            //         但產不出合法的 after 狀態，進度永遠是 0。
             //
-            // 正解是兩個條件同時滿足：
+            // 三個條件要同時成立：
             //   · 手上要有好幾張，才需要「挑」
-            //   · 但只有一張能構成重組，其餘都是死牌（接不上任何東西）
+            //   · 只有一張能構成重組，其餘都是死牌
+            //   · Group 要四張，抽走一張還剩三張，這一步才走得出去
             if (v == 0) {
-                s.board = {{T(5, Color::BLACK), T(5, Color::RED), T(5, Color::BLUE)},
-                           {T(7, Color::BLACK), T(7, Color::RED), T(7, Color::BLUE)}};
+                s.board = {{T(5, Color::BLACK), T(5, Color::RED),
+                            T(5, Color::BLUE),  T(5, Color::YELLOW)},
+                           {T(7, Color::BLACK), T(7, Color::RED),
+                            T(7, Color::BLUE),  T(7, Color::YELLOW)}};
                 s.hand  = {T(12, Color::YELLOW), T(6, Color::BLACK), T(2, Color::RED)};
             } else if (v == 1) {
-                s.board = {{T(9, Color::RED), T(9, Color::YELLOW), T(9, Color::BLUE)},
-                           {T(11, Color::RED), T(11, Color::YELLOW), T(11, Color::BLUE)}};
+                s.board = {{T(9, Color::RED),  T(9, Color::YELLOW),
+                            T(9, Color::BLUE), T(9, Color::BLACK)},
+                           {T(11, Color::RED),  T(11, Color::YELLOW),
+                            T(11, Color::BLUE), T(11, Color::BLACK)}};
                 s.hand  = {T(3, Color::BLACK), T(13, Color::BLUE), T(10, Color::RED)};
             } else {
-                s.board = {{T(2, Color::BLUE), T(2, Color::BLACK), T(2, Color::YELLOW)},
-                           {T(4, Color::BLUE), T(4, Color::BLACK), T(4, Color::YELLOW)}};
+                s.board = {{T(2, Color::BLUE), T(2, Color::BLACK),
+                            T(2, Color::YELLOW), T(2, Color::RED)},
+                           {T(4, Color::BLUE), T(4, Color::BLACK),
+                            T(4, Color::YELLOW), T(4, Color::RED)}};
                 s.hand  = {T(3, Color::BLUE), T(8, Color::RED), T(11, Color::YELLOW)};
             }
             break;
-
         default:  // 長龍切斷
             if (v == 0) {
                 s.board = {{T(1, Color::BLACK), T(2, Color::BLACK), T(3, Color::BLACK),
@@ -277,6 +286,9 @@ RummiState applyMove(const RummiState& s, const RummiMove& m) {
             //
             // 這裡的實作：把手牌那張的同色鄰居從各組抽出來，
             // 跟它拼成新的一組，剩下的牌留在原位。
+            //
+            // 注意：抽完之後各組至少要剩三張，否則盤面不合法。
+            // 關卡局面必須配合這件事設計（見 makeLevelState case 5）。
             if (m.tiles.empty()) break;
             Tile* played = m.tiles.front();
             if (played->isJoker()) { next.board.push_back(m.tiles); break; }
@@ -356,11 +368,92 @@ RummiState applyMove(const RummiState& s, const RummiMove& m) {
 }  // namespace
 
 // ═════════════════════════════════════════════════════════
+//  關卡結束的 recap
+//
+//  出牌次數達標只證明「做得出來」，recap 問的是「知不知道為什麼」。
+//  答錯第一次給提示可以再試，第二次才給完整解答——
+//  跟遊戲內的引導同一套邏輯，不讓人用猜的過關。
+//
+//  can_advance = moves_done && recap_done，
+//  所以沒有這一段，任何一關都過不了。
+// ═════════════════════════════════════════════════════════
+bool runRecap(CoachSession<RummiState, RummiMove>& session) {
+    std::random_device rd;
+    unsigned seed = rd() | 1u;          // 0 代表不洗牌，這裡一定要非零
+
+    std::optional<Recap> maybe = session.startRecap(seed);
+    if (!maybe) {
+        std::cout << "\n  出牌條件還沒達成，先把這一關打完。\n";
+        return false;
+    }
+    Recap recap = *maybe;
+
+    std::cout << "\n──────────────────────────────────────────────────\n";
+    std::cout << "Recap · " << recap.questionCount() << " 題\n";
+    std::cout << "  做得出來不等於知道為什麼。換個情境再問一次。\n";
+    std::cout << "  答錯會先給提示，可以再試一次。\n";
+
+    for (int i = 0; i < recap.questionCount(); ++i) {
+        const McqQuestion& q = recap.question(i);
+        bool settled = false;
+
+        std::cout << "\n  第 " << (i + 1) << " 題　" << q.prompt << "\n\n";
+        for (std::size_t k = 0; k < q.options.size(); ++k)
+            std::cout << "    " << (k + 1) << "  " << q.options[k].text << "\n";
+
+        while (!settled) {
+            std::cout << "\n  > ";
+            std::string line;
+            if (!std::getline(std::cin, line)) return false;
+
+            int choice = 0;
+            std::istringstream iss(line);
+            if (!(iss >> choice) || choice < 1 ||
+                choice > static_cast<int>(q.options.size())) {
+                std::cout << "  輸入 1 到 " << q.options.size() << " 之間的數字。\n";
+                continue;
+            }
+
+            switch (recap.answer(i, choice - 1)) {
+                case AnswerVerdict::CORRECT_FIRST:
+                    std::cout << "\n  對了。\n";
+                    settled = true;
+                    break;
+                case AnswerVerdict::CORRECT_AFTER_HINT:
+                    std::cout << "\n  這次對了。\n";
+                    settled = true;
+                    break;
+                case AnswerVerdict::WRONG_SHOW_HINT:
+                    std::cout << "\n  不對。提示：" << q.hint << "\n";
+                    break;
+                case AnswerVerdict::WRONG_SHOW_ANSWER:
+                    std::cout << "\n  還是不對。正解是 " << (q.correctIndex() + 1)
+                              << "　" << q.options[q.correctIndex()].text << "\n";
+                    std::cout << "  " << q.explanation << "\n";
+                    settled = true;
+                    break;
+            }
+        }
+    }
+
+    RecapResult r = recap.finish();
+    session.submitRecap(r);
+
+    std::cout << "\n──────────────────────────────────────────────────\n";
+    std::cout << "  一次就對 " << r.correct_first_try
+              << "　看提示後對 " << r.correct_with_hint
+              << "　兩次都錯 " << r.wrong
+              << "　（共 " << r.total << " 題）\n";
+    std::cout << (r.passed ? "  Recap 過了。\n"
+                           : "  Recap 沒過。按 r 可以重來一次。\n");
+    return r.passed;
+}
+
+// ═════════════════════════════════════════════════════════
 //  主流程
 // ═════════════════════════════════════════════════════════
 int main() {
     RummikubDomain domain;
-    CoachEngine<RummiState, RummiMove> engine(domain);
 
     std::cout << "══════════════════════════════════════════════════\n";
     std::cout << " 拉密認知教練 · 六關\n";
@@ -368,25 +461,55 @@ int main() {
     std::cout << "  每一關教一招。引導會隨著關卡遞減——\n";
     std::cout << "  第一關卡住馬上給答案，第六關只會輕推，\n";
     std::cout << "  而且要連續三次自己找到才算過。\n\n";
+    // ── 選模式 ──
+    //
+    // 同一個引擎、同一套六關，差別只在 Coach 的音量。
+    // 模式把關卡門檻乘上倍率，並設一個上限——
+    // 即使 L1 的設定寫著可以講答案，較量組以上也不會給。
+    std::cout << "  先選一個模式：\n\n";
+    auto modes = CoachModes::all();
+    for (size_t i = 0; i < modes.size(); ++i) {
+        const auto& p = CoachModes::get(modes[i]);
+        std::cout << "    " << (i + 1) << "  " << p.name << "\n";
+        std::cout << "       " << p.description << "\n";
+    }
+    std::cout << "\n  > ";
+    std::string pick;
+    std::getline(std::cin, pick);
+    int mi = 0;
+    if (!pick.empty() && std::isdigit(static_cast<unsigned char>(pick[0])))
+        mi = pick[0] - '1';
+    if (mi < 0 || mi >= static_cast<int>(modes.size())) mi = 0;
+    CoachMode mode = modes[mi];
+    const auto& mp = CoachModes::get(mode);
+    std::cout << "\n  → " << mp.name << "\n\n";
+
+    // Session 把引擎、模式、Recap 包在一起——
+    // 模式的音量調整在 effectiveSpec() 裡，不用呼叫端自己套。
+    CoachSession<RummiState, RummiMove> session(domain, mode);
+
     std::cout << "  怎麼出牌：\n";
     std::cout << "    直接打手牌的編號，例如  1\n";
     std::cout << "    要出好幾張就用空白隔開，例如  1 3\n\n";
     std::cout << "  其他指令：\n";
     std::cout << "    p  我想不到，跳過這一回合（會累積卡關）\n";
     std::cout << "    h  現在就給我提示\n";
-    std::cout << "    n  這一關先跳過\n";
+    std::cout << "    r  做這一關的 recap\n";
+    std::cout << "    n  這一關先跳過（開發用，不檢查條件）\n";
     std::cout << "    q  離開\n\n";
 
     int stuck = 0;
-    RummiState state = makeLevelState(engine.currentLevel(), 0);
+    RummiState state = makeLevelState(session.currentLevel(), 0);
 
     while (true) {
-        const LevelSpec& spec = engine.currentSpec();
-        const auto& prog = engine.progressOf(spec.technique);
+        // effectiveSpec() 已經套過模式的音量了
+        const LevelSpec spec = session.effectiveSpec();
+        const auto& prog = session.progressOf(spec.technique);
 
         std::cout << "\n──────────────────────────────────────────────────\n";
         std::cout << "第 " << spec.level << " 關 · " << spec.name
-                  << "（引導 " << spec.guidance_percent << "%）\n";
+                  << "（引導 " << spec.guidance_percent << "%）"
+                  << "　[" << mp.name << "]\n";
         std::cout << "進度  用出 " << prog.total_uses << "/" << spec.required_uses
                   << "　自主 " << prog.unassisted_uses << "/" << spec.required_unassisted;
         std::string st = CoachEngine<RummiState, RummiMove>::stars(prog.mastery);
@@ -396,7 +519,7 @@ int main() {
         printState(state);
 
         // ── 引擎決定要不要開口 ──
-        Advice advice = engine.tick(state, stuck);
+        Advice advice = session.tick(state, stuck);
         if (advice.speak) {
             std::cout << "\n  Coach（" << tierLabel(advice.tier);
             if (advice.from_safety_net) std::cout << " · 保底";
@@ -423,12 +546,20 @@ int main() {
         }
 
         if (c == 'n') {
-            if (!engine.advance()) {
+            // 開發用的跳關。走 skipLevel() 而不是 advance()——
+            // advance() 會檢查出牌次數與 recap，條件不足時回 false，
+            // 而那個 false 跟「沒有下一關」長得一模一樣。
+            if (!session.skipLevel()) {
                 std::cout << "\n已經是最後一關了。\n";
             } else {
                 stuck = 0;
-                state = makeLevelState(engine.currentLevel(), 0);
+                state = makeLevelState(session.currentLevel(), 0);
             }
+            continue;
+        }
+
+        if (c == 'r') {
+            runRecap(session);
             continue;
         }
 
@@ -507,23 +638,51 @@ int main() {
 
             // 這一步是重點：引擎從「動作前後的狀態」反推用了哪一招，
             // 而不是由呼叫端直接告訴它。領域負責認，引擎負責記。
-            engine.observe(before, state);
+            MoveMetrics mm;
+            mm.tiles_played = static_cast<int>(mv->tiles.size());
+            mm.hand_size    = static_cast<int>(before.hand.size());
+            // 「動到桌面」看的是招數，不是出手前桌面有沒有牌。
+            // 定義跟 coach/demo_session.cpp 一致。
+            mm.touched_board = (mv->kind == RummiMove::BOARD_RESHUFFLE ||
+                                mv->kind == RummiMove::RUN_SPLIT);
+            session.play(before, state, mm);
 
             std::cout << "\n  做了：" << domain.hint(HintTier::REVEAL_MOVE, *mv, before) << "\n";
             stuck = 0;
 
-            if (engine.canAdvance()) {
+            // ── 過關判斷 ──
+            //
+            // can_advance = moves_done && recap_done。
+            // 只看 moves_done 會在 recap 還沒過的時候就宣布過關，
+            // 接著 advance() 回 false，呼叫端誤以為沒有下一關。
+            AdvanceStatus ast = session.advanceStatus();
+
+            if (ast.moves_done && !ast.recap_done) {
+                std::cout << "\n  出牌條件達成（用出 " << ast.uses << "/" << ast.uses_needed
+                          << "　自主 " << ast.unassisted << "/" << ast.unassisted_needed
+                          << "）。接下來是 recap。\n";
+                runRecap(session);
+                ast = session.advanceStatus();
+            }
+
+            if (ast.can_advance) {
                 std::cout << "\n  ★ 第 " << spec.level << " 關過了。\n";
-                if (!engine.advance()) {
+
+                // 最後一關要用關卡數判斷。advance() 的 false 同時代表
+                // 「條件不足」和「沒有下一關」，呼叫端分不出來。
+                bool was_last = session.currentLevel()
+                                >= static_cast<int>(domain.levels().size());
+                if (was_last || !session.advance()) {
                     std::cout << "\n══════════════════════════════════════════════════\n";
                     std::cout << " 六關全部走完\n";
                     std::cout << "══════════════════════════════════════════════════\n";
                     break;
                 }
-                state = makeLevelState(engine.currentLevel(), 0);
+                stuck = 0;
+                state = makeLevelState(session.currentLevel(), 0);
             } else {
                 // 同一關再來一次——換下一個局面，不是同一題重來
-                const auto& p2 = engine.progressOf(spec.technique);
+                const auto& p2 = session.progressOf(spec.technique);
                 state = makeLevelState(spec.level, p2.total_uses);
             }
             continue;
@@ -536,7 +695,7 @@ int main() {
     std::cout << "\n──────────────────────────────────────────────────\n";
     std::cout << "掌握度\n\n";
     for (const auto& L : domain.levels()) {
-        const auto& p = engine.progressOf(L.technique);
+        const auto& p = session.progressOf(L.technique);
         std::cout << "  " << std::left << std::setw(16) << L.name
                   << "用出 " << p.total_uses
                   << "　自主 " << p.unassisted_uses << "　"
